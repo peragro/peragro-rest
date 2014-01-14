@@ -1,4 +1,6 @@
+import os
 import urllib
+
 from django.contrib.auth.models import User, Group
 from rest_framework import serializers
 
@@ -34,21 +36,34 @@ class DynamicFieldsSerializer(serializers.Serializer):
         if exclude:      
             # Drop any fields that are not specified in the `fields` argument.
             def recurse(object, field):
-                print('recurse', object, field)
                 path = field.split('.', 1)
                 if len(path) == 1:
                     if path[0] in object.fields:
-                        object.fields.pop(path[0])
+                        if not hasattr(object, '_DynamicFieldsSerializer__excluded_fields'):
+                            object.__excluded_fields = []
+                        object.__excluded_fields.append(path[0])
                 else:
                     recurse(object.fields[path[0]], path[1])
             
             for field in exclude:
                 recurse(self, field)
+                
+    def to_native(self, obj):
+        ret = super(DynamicFieldsSerializer, self).to_native(obj)
+        fields = getattr(self, '_DynamicFieldsSerializer__excluded_fields', [])
+        for field in fields:
+            if field in ret:
+                del ret[field]
+        return ret
 
 
 class FileIdSerializer(DynamicFieldsSerializer):
     filename = serializers.CharField()
     hash = serializers.CharField(max_length=40)
+    base_name = serializers.SerializerMethodField('get_base_name')
+    
+    def get_base_name(self, file_id):
+        return os.path.basename(file_id.filename)
 
     def restore_object(self, attrs, instance=None):
         """
@@ -96,10 +111,12 @@ class AssetReferenceSerializer(DynamicFieldsSerializer):
 class FileReferenceSerializer(DynamicFieldsSerializer):
     id = serializers.CharField(source='file.hash')
     file = FileIdSerializer()
+    metadata = MetaDataValueField()
     #assets = AssetReferenceSerializer(many=True)
     assets = AssetListingField(many=True)
 
 class FileReferenceVerboseSerializer(DynamicFieldsSerializer):
     id = serializers.CharField(source='file.hash')
     file = FileIdSerializer()
+    metadata = MetaDataValueField()
     assets = AssetReferenceSerializer(many=True, exclude=('metadata', 'dependencies'))

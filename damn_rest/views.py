@@ -32,10 +32,10 @@ class FileReferenceViewSet(viewsets.ViewSet):
         store = MetaDataStore(path)
         references = []
         for filename in os.listdir(path):
-            a_file_reference = store.get_metadata(path, '90ca0b2230d6f9b486cd932e1ae1c28b780a2b0c')
+            a_file_reference = store.get_metadata(path, filename)
             references.append(a_file_reference)
 
-        serializer = FileReferenceSerializer(references, many=True, exclude=('file.hash', 'assets'))
+        serializer = FileReferenceSerializer(references, many=True, exclude=('file.hash', 'assets', 'metadata'))
         return Response(serializer.data)
 
     #def create(self, request):
