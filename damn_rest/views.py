@@ -3,7 +3,7 @@ from django.contrib.auth.models import User, Group
 from rest_framework import viewsets
 from rest_framework.response import Response
 from rest_framework.decorators import action, link
-from damn_rest.serializers import UserSerializer, GroupSerializer, FileReferenceSerializer, FileReferenceVerboseSerializer, AssetReferenceSerializer
+from damn_rest.serializers import UserSerializer, GroupSerializer, FileDescriptionSerializer, FileDescriptionVerboseSerializer, AssetDescriptionSerializer
 
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -22,7 +22,7 @@ class GroupViewSet(viewsets.ModelViewSet):
     serializer_class = GroupSerializer
 
 
-class FileReferenceViewSet(viewsets.ViewSet):
+class FileDescriptionViewSet(viewsets.ViewSet):
     """
     List all snippets, or create a new snippet.
     """ 
@@ -32,10 +32,10 @@ class FileReferenceViewSet(viewsets.ViewSet):
         store = MetaDataStore(path)
         references = []
         for filename in os.listdir(path):
-            a_file_reference = store.get_metadata(path, filename)
-            references.append(a_file_reference)
+            file_descr = store.get_metadata(path, filename)
+            references.append(file_descr)
 
-        serializer = FileReferenceSerializer(references, many=True, exclude=('file.hash', 'assets', 'metadata'))
+        serializer = FileDescriptionSerializer(references, many=True, exclude=('file.hash', 'assets', 'metadata'))
         return Response(serializer.data)
 
     #def create(self, request):
@@ -46,9 +46,9 @@ class FileReferenceViewSet(viewsets.ViewSet):
         from damn_at import MetaDataStore
         path = '/tmp/damn'
         store = MetaDataStore(path)
-        a_file_reference = store.get_metadata(path, pk)
+        file_descr = store.get_metadata(path, pk)
 
-        serializer = FileReferenceVerboseSerializer(a_file_reference)
+        serializer = FileDescriptionVerboseSerializer(file_descr)
 
         return Response(serializer.data)
 
@@ -56,9 +56,9 @@ class FileReferenceViewSet(viewsets.ViewSet):
         from damn_at import MetaDataStore
         path = '/tmp/damn'
         store = MetaDataStore(path)
-        a_file_reference = store.get_metadata(path, pk)
+        file_descr = store.get_metadata(path, pk)
 
-        serializer = FileReferenceSerializer(a_file_reference)
+        serializer = FileDescriptionSerializer(file_descr)
         return Response(serializer.data)
 
     #def update(self, request, pk=None):
@@ -72,7 +72,7 @@ class FileReferenceViewSet(viewsets.ViewSet):
 
 from rest_framework.decorators import action
 
-class AssetReferenceViewSet(viewsets.ViewSet):
+class AssetDescriptionViewSet(viewsets.ViewSet):
     """
     List all snippets, or create a new snippet.
     """ 
@@ -87,9 +87,9 @@ class AssetReferenceViewSet(viewsets.ViewSet):
         from damn_at import MetaDataStore
         path = '/tmp/damn'
         store = MetaDataStore(path)
-        a_file_reference = store.get_metadata(path, hash)
+        file_descr = store.get_metadata(path, hash)
         
-        for asset in a_file_reference.assets:
+        for asset in file_descr.assets:
             if pk.startswith(asset.asset.subname):
-                serializer = AssetReferenceSerializer(asset)
+                serializer = AssetDescriptionSerializer(asset)
         return Response(serializer.data)

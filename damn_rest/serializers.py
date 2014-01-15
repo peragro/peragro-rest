@@ -4,7 +4,7 @@ import urllib
 from django.contrib.auth.models import User, Group
 from rest_framework import serializers
 
-from damn_at import FileId, FileReference, AssetReference, MetaDataType
+from damn_at import FileId, FileDescription, AssetDescription, MetaDataType
 
 
 
@@ -85,7 +85,7 @@ class AssetIdSerializer(DynamicFieldsSerializer):
 
 class AssetListingField(serializers.RelatedField):
     def to_native(self, asset):
-        if isinstance(asset, AssetReference):
+        if isinstance(asset, AssetDescription):
             asset = asset.asset
         return UniqueAssetId(asset)
 
@@ -98,7 +98,7 @@ class MetaDataValueField(serializers.RelatedField):
         return ret  
     
     
-class AssetReferenceSerializer(DynamicFieldsSerializer):
+class AssetDescriptionSerializer(DynamicFieldsSerializer):
     id = serializers.SerializerMethodField('get_id')
     asset = AssetIdSerializer()
     metadata = MetaDataValueField()
@@ -108,15 +108,15 @@ class AssetReferenceSerializer(DynamicFieldsSerializer):
     def get_id(self, asset):
         return UniqueAssetId(asset.asset)
 
-class FileReferenceSerializer(DynamicFieldsSerializer):
+class FileDescriptionSerializer(DynamicFieldsSerializer):
     id = serializers.CharField(source='file.hash')
     file = FileIdSerializer()
     metadata = MetaDataValueField()
-    #assets = AssetReferenceSerializer(many=True)
+    #assets = AssetDescriptionSerializer(many=True)
     assets = AssetListingField(many=True)
 
-class FileReferenceVerboseSerializer(DynamicFieldsSerializer):
+class FileDescriptionVerboseSerializer(DynamicFieldsSerializer):
     id = serializers.CharField(source='file.hash')
     file = FileIdSerializer()
     metadata = MetaDataValueField()
-    assets = AssetReferenceSerializer(many=True, exclude=('metadata', 'dependencies'))
+    assets = AssetDescriptionSerializer(many=True, exclude=('metadata', 'dependencies'))

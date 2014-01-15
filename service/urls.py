@@ -6,8 +6,8 @@ router = routers.DefaultRouter()
 router.register(r'users', views.UserViewSet)
 router.register(r'groups', views.GroupViewSet)
 
-router.register(r'files', views.FileReferenceViewSet, base_name = 'files')
-router.register(r'assets', views.AssetReferenceViewSet, base_name = 'assets')
+router.register(r'files', views.FileDescriptionViewSet, base_name = 'files')
+router.register(r'assets', views.AssetDescriptionViewSet, base_name = 'assets')
 
 # Wire up our API using automatic URL routing.
 # Additionally, we include login URLs for the browseable API.
