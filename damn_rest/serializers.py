@@ -13,18 +13,6 @@ def UniqueAssetId(asset_id):
     return urllib.quote(name.replace('/', '|'))
 
 
-class UserSerializer(serializers.HyperlinkedModelSerializer):
-    class Meta:
-        model = User
-        fields = ('url', 'username', 'email', 'groups')
-
-
-class GroupSerializer(serializers.HyperlinkedModelSerializer):
-    class Meta:
-        model = Group
-        fields = ('url', 'name')
-        
-        
 class DynamicFieldsSerializer(serializers.Serializer):        
     def __init__(self, *args, **kwargs):
         # Don't pass the 'fields' arg up to the superclass

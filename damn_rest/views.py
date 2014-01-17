@@ -1,32 +1,45 @@
 import os
 from django.contrib.auth.models import User, Group
+from rest_framework.views import APIView
 from rest_framework import viewsets
+from rest_framework import mixins
 from rest_framework.response import Response
 from rest_framework.decorators import action, link
-from damn_rest.serializers import UserSerializer, GroupSerializer, FileDescriptionSerializer, FileDescriptionVerboseSerializer, AssetDescriptionSerializer
+from damn_rest.serializers import FileDescriptionSerializer, FileDescriptionVerboseSerializer, AssetDescriptionSerializer
 
 
-class UserViewSet(viewsets.ModelViewSet):
-    """
-    API endpoint that allows users to be viewed or edited.
-    """
-    queryset = User.objects.all()
-    serializer_class = UserSerializer
+from rest_framework.parsers import MultiPartParser, FileUploadParser
+from rest_framework import authentication, permissions
+
+class FileUploadView(APIView):
+    parser_classes = (MultiPartParser,)
+    
+    authentication_classes = (authentication.TokenAuthentication,)
+    permission_classes = (permissions.IsAdminUser,)
+
+    def post(self, request, project_name):
+        print('FileUploadView', project_name)
+        print('FileUploadView', request.FILES)
+        file_obj = request.FILES['file']
+        print(dir(file_obj))
+        print(file_obj.name)
+        print(file_obj.content_type)
+        print(file_obj.read(8))
+        # ...
+        # do some staff with uploaded file
+        # ...
+        return Response(status=204)
 
 
-class GroupViewSet(viewsets.ModelViewSet):
-    """
-    API endpoint that allows groups to be viewed or edited.
-    """
-    queryset = Group.objects.all()
-    serializer_class = GroupSerializer
 
-
-class FileDescriptionViewSet(viewsets.ViewSet):
+class FileDescriptionViewSet(viewsets.ReadOnlyModelViewSet):
     """
     List all snippets, or create a new snippet.
     """ 
-    def list(self, request):
+    serializer_class = FileDescriptionSerializer
+    paginate_by = 2
+    
+    def get_queryset(self):
         from damn_at import MetaDataStore
         path = '/tmp/damn'
         store = MetaDataStore(path)
@@ -34,12 +47,10 @@ class FileDescriptionViewSet(viewsets.ViewSet):
         for filename in os.listdir(path):
             file_descr = store.get_metadata(path, filename)
             references.append(file_descr)
-
-        serializer = FileDescriptionSerializer(references, many=True, exclude=('file.hash', 'assets', 'metadata'))
-        return Response(serializer.data)
-
-    #def create(self, request):
-    #    pass
+        return references
+        
+    def get_object(self, queryset=None):
+        pass
     
     @link(permission_classes=[])
     def full(self, request, pk=None):
@@ -61,25 +72,17 @@ class FileDescriptionViewSet(viewsets.ViewSet):
         serializer = FileDescriptionSerializer(file_descr)
         return Response(serializer.data)
 
-    #def update(self, request, pk=None):
-    #    pass
-
-    #def partial_update(self, request, pk=None):
-    #    pass
-
-    #def destroy(self, request, pk=None):
-    #    pass
 
 from rest_framework.decorators import action
 
-class AssetDescriptionViewSet(viewsets.ViewSet):
+class AssetDescriptionViewSet(viewsets.ReadOnlyModelViewSet):
     """
     List all snippets, or create a new snippet.
     """ 
+    serializer_class = AssetDescriptionSerializer
     
-    @action(permission_classes=[])
-    def set_password(self, request, pk=None):
-        pass
+    def get_queryset(self):
+        return []
 
     def retrieve(self, request, pk=None):
         hash = pk[:40]
