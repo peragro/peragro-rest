@@ -6,11 +6,10 @@ from rest_framework import serializers
 
 from damn_at import FileId, FileDescription, AssetDescription, MetaDataType
 
-
+from damn_at import utilities
 
 def UniqueAssetId(asset_id):
-    name = '%s%s%s' % (asset_id.file.hash, asset_id.subname, asset_id.mimetype)
-    return urllib.quote(name.replace('/', '|'))
+    return utilities.unique_asset_id_reference(asset_id)
 
 
 class DynamicFieldsSerializer(serializers.Serializer):        
