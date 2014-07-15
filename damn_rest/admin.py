@@ -1,3 +1,5 @@
 from django.contrib import admin
 
-# Register your models here.
+
+from damn_rest.models import AssetReference
+admin.site.register(AssetReference)
