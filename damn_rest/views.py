@@ -34,13 +34,14 @@ class FileUploadView(APIView):
           print destination.name
           for chunk in file_obj.chunks():
               destination.write(chunk)
-              
+          destination.flush()    
           from damn_at import mimetypes
           print mimetypes.guess_type(destination.name, False)
           
           import logging
           from damn_at import MetaDataStore, Analyzer
           from damn_at.analyzer import analyze
+          logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
           
           analyzer = Analyzer()
           metadatastore = MetaDataStore('/tmp/damn')  

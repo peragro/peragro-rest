@@ -24,10 +24,11 @@ class AssetReferenceManager(models.Manager):
       
       obj, created = super(AssetReferenceManager, self).get_or_create(**kwargs)
       if created:
-	obj.file_id_filename = assetdescription.asset.file.filename
+        obj.file_id_filename = assetdescription.asset.file.filename
         metadata = {}
-        for name, value in assetdescription.metadata.items():
-          metadata[name] = get_metadatavalue_type(value)
+        if assetdescription.metadata:
+            for name, value in assetdescription.metadata.items():
+              metadata[name] = get_metadatavalue_type(value)
         obj.metadata = metadata
         obj.save()
       return obj, created
