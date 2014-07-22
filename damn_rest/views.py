@@ -120,10 +120,7 @@ class AssetDescriptionViewSet(viewsets.ReadOnlyModelViewSet):
     
     @link(permission_classes=[])
     def tasks(self, request, pk):
-        queryset = self.get_queryset()
-        filter = {'pk': self.kwargs['pk']}
-
-        obj = get_object_or_404(queryset, **filter)
+        obj = self.get_object()
         
         from django_project.serializers import TaskSerializer
         serializer = TaskSerializer(obj.tasks, many=True)

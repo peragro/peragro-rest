@@ -110,15 +110,16 @@ class FileDescriptionVerboseSerializer(DynamicFieldsSerializer):
 
 
 class AssetReferenceSerializer(DynamicFieldsSerializer):
-    id = serializers.HyperlinkedIdentityField(view_name='asset-detail', format='html')
+    id = serializers.HyperlinkedIdentityField(view_name='assetreference-detail', format='html')
     def to_native(self, asset):
         ret = super(AssetReferenceSerializer, self).to_native(asset)
         ret['asset'] = {'mimetype': asset.mimetype, 'subname': asset.subname}
         ret['asset']['file'] = {'hash': asset.file_id_hash, 'filename': asset.file_id_filename}
         return ret
 
+
 class AssetReferenceVerboseSerializer(DynamicFieldsSerializer):
-    id = serializers.HyperlinkedIdentityField(view_name='asset-detail', format='html')
+    id = serializers.HyperlinkedIdentityField(view_name='assetreference-detail', format='html')
     def to_native(self, asset):
         ret = super(AssetReferenceVerboseSerializer, self).to_native(asset)
         ret['asset'] = {'mimetype': asset.mimetype, 'subname': asset.subname}

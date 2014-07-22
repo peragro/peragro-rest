@@ -10,7 +10,7 @@ router = routers.DefaultRouter()
 #router.register(r'groups', views.GroupViewSet)
 
 router.register(r'files', views.FileDescriptionViewSet, base_name = 'file')
-router.register(r'assets', views.AssetDescriptionViewSet, base_name = 'asset')
+router.register(r'assets', views.AssetDescriptionViewSet, base_name = 'assetreference')
 
 import notifications
 import django_project
