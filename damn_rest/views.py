@@ -112,7 +112,10 @@ class AssetDescriptionViewSet(viewsets.ReadOnlyModelViewSet):
         
     def get_object(self):
         queryset = self.get_queryset()
-        filter = {'pk': self.kwargs['pk']}
+        if self.kwargs['pk'].isnumeric():
+            filter = {'id': self.kwargs['pk']}
+        else:
+            filter = {'slug': self.kwargs['pk']}
 
         obj = get_object_or_404(queryset, **filter)
         self.check_object_permissions(self.request, obj)
