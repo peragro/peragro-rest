@@ -68,7 +68,9 @@ REST_FRAMEWORK = {
         #'rest_framework.permissions.IsAdminUser',
         'rest_framework.permissions.AllowAny',
         ),
-    'PAGINATE_BY': 10
+    'PAGINATE_BY': 10,                 # Default to 10
+    'PAGINATE_BY_PARAM': 'page_size',  # Allow client to override, using `?page_size=xxx`.
+    'MAX_PAGINATE_BY': 100             # Maximum limit allowed when using `?page_size=xxx`.
 }
 
 ROOT_URLCONF = 'service.urls'
