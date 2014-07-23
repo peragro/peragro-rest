@@ -1,10 +1,14 @@
 import os
+from django.shortcuts import get_object_or_404
+from django.http import StreamingHttpResponse
 from django.contrib.auth.models import User, Group
 from rest_framework.views import APIView
 from rest_framework import viewsets
 from rest_framework import mixins
 from rest_framework.response import Response
 from rest_framework.decorators import action, link
+from rest_framework_extensions.mixins import NestedViewSetMixin
+
 from damn_rest.serializers import FileDescriptionSerializer, FileDescriptionVerboseSerializer, AssetReferenceSerializer, AssetReferenceVerboseSerializer
 
 
@@ -81,22 +85,38 @@ class FileDescriptionViewSet(viewsets.ReadOnlyModelViewSet):
         store = MetaDataStore(path)
         file_descr = store.get_metadata(path, pk)
 
-        serializer = FileDescriptionVerboseSerializer(file_descr)
+        serializer = FileDescriptionVerboseSerializer(file_descr, context={'request': request})
 
         return Response(serializer.data)
 
     def retrieve(self, request, pk=None):
         from damn_at import MetaDataStore
+        from damn_at.metadatastore import MetaDataStoreFileException
         path = '/tmp/damn'
         store = MetaDataStore(path)
-        file_descr = store.get_metadata(path, pk)
+        try:
+            file_descr = store.get_metadata(path, pk)
 
-        serializer = FileDescriptionSerializer(file_descr)
-        return Response(serializer.data)
+            serializer = FileDescriptionSerializer(file_descr, context={'request': request})
+            return Response(serializer.data)
+        except MetaDataStoreFileException as mdsfe:
+            return Response(mdsfe.msg, status=404)
+    
+    @link(permission_classes=[])
+    def download(self, request, pk=None):
+        from damn_at import MetaDataStore
+        from damn_at.metadatastore import MetaDataStoreFileException
+        path = '/tmp/damn'
+        store = MetaDataStore(path)
+        try:
+            file_descr = store.get_metadata(path, pk)
 
+            fsock = open(file_descr.file.filename, 'rb')
+            return StreamingHttpResponse(fsock, content_type=file_descr.mimetype)
+            
+        except MetaDataStoreFileException as mdsfe:
+            return Response(status=404)
 
-from django.shortcuts import get_object_or_404
-from django.http import HttpResponse
 
 class AssetDescriptionViewSet(viewsets.ReadOnlyModelViewSet):
     """
@@ -147,9 +167,43 @@ class AssetDescriptionViewSet(viewsets.ReadOnlyModelViewSet):
         print paths
         fsock = open(os.path.join('/tmp/transcoded/', paths['256x256'][0]), 'rb')
 
-        return HttpResponse(fsock, mimetype='image/png')
+        return StreamingHttpResponse(fsock, content_type='image/png')
 
 
+class AssetRevisionsViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
+    from django_project import serializers
+    serializer_class = serializers.VersionSerializer
+    queryset = AssetReference.objects.all()
+    def get_queryset(self):
+        qs = super(AssetRevisionsViewSet, self).get_queryset()[0].versions() 
+        return qs
+    def get_parents_query_dict(self):
+        if self.kwargs['parent_lookup_asset'].isnumeric():
+            filter = {'id': self.kwargs['parent_lookup_asset']}
+        else:
+            filter = {'slug': self.kwargs['parent_lookup_asset']}
+        return filter
+        
+    @link(permission_classes=[])
+    def preview(self, request, parent_lookup_asset, pk):
+        obj = self.get_queryset().get(pk=pk)
+        
+        
+        from damn_at import MetaDataStore
+        from damn_at.utilities import find_asset_id_in_file_descr
+        path = '/tmp/damn'
+        store = MetaDataStore(path)
+        asset = obj.object_version.object
+        file_descr = store.get_metadata(path, asset.file_id_hash)
+        
+        asset_id = find_asset_id_in_file_descr(file_descr, asset.subname, asset.mimetype)
+        
+        paths = transcode(file_descr, asset_id)
+        print paths
+        fsock = open(os.path.join('/tmp/transcoded/', paths['256x256'][0]), 'rb')
+
+        return StreamingHttpResponse(fsock, content_type='image/png')
+        
 
 def transcode(file_descr, asset_id, dst_mimetype='image/png', options={}, path='/tmp/transcoded/'):
     """

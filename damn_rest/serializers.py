@@ -44,6 +44,17 @@ class DynamicFieldsSerializer(serializers.Serializer):
         return ret
 
 
+class UrlMixin:
+    def get_url(self, obj):
+        try:
+            from rest_framework.reverse import reverse
+            kwargs = {'pk': self.get_id(obj)}
+            return reverse(self.view_name, kwargs=kwargs, request=self.context.get('request', None), format=None)
+        except Exception as e:
+            print('Exception', e)
+            return ''
+            
+            
 class FileIdSerializer(DynamicFieldsSerializer):
     filename = serializers.CharField()
     hash = serializers.CharField(max_length=40)
@@ -52,29 +63,22 @@ class FileIdSerializer(DynamicFieldsSerializer):
     def get_base_name(self, file_id):
         return os.path.basename(file_id.filename)
 
-    def restore_object(self, attrs, instance=None):
-        """
-        Given a dictionary of deserialized field values, either update
-        an existing model instance, or create a new model instance.
-        """
-        if instance is not None:
-            instance.email = attrs.get('email', instance.email)
-            instance.content = attrs.get('content', instance.content)
-            instance.created = attrs.get('created', instance.created)
-            return instance
-        return Comment(**attrs)
-
 
 class AssetIdSerializer(DynamicFieldsSerializer):
     subname = serializers.CharField()
     mimetype = serializers.CharField()
     file = FileIdSerializer()
 
-class AssetListingField(serializers.RelatedField):
-    def to_native(self, asset):
-        if isinstance(asset, AssetDescription):
-            asset = asset.asset
-        return UniqueAssetId(asset)
+
+class AssetListingField(UrlMixin, serializers.Serializer):
+    view_name = 'assetreference-detail'
+    
+    id = serializers.SerializerMethodField('get_id')
+    url = serializers.SerializerMethodField('get_url')
+    
+    def get_id(self, asset):
+        return UniqueAssetId(asset.asset)
+
 
 class MetaDataValueField(serializers.RelatedField):
     def to_native(self, metadata):
@@ -85,8 +89,11 @@ class MetaDataValueField(serializers.RelatedField):
         return ret  
     
     
-class AssetDescriptionSerializer(DynamicFieldsSerializer):
+class AssetDescriptionSerializer(UrlMixin, DynamicFieldsSerializer):
+    view_name = 'assetreference-detail'
+    
     id = serializers.SerializerMethodField('get_id')
+    url = serializers.SerializerMethodField('get_url')
     asset = AssetIdSerializer()
     metadata = MetaDataValueField()
     #dependencies = AssetListingField(many=True)
@@ -95,17 +102,22 @@ class AssetDescriptionSerializer(DynamicFieldsSerializer):
     def get_id(self, asset):
         return UniqueAssetId(asset.asset)
 
-class FileDescriptionSerializer(DynamicFieldsSerializer):
+
+class FileDescriptionSerializer(UrlMixin, DynamicFieldsSerializer):
+    view_name = 'file-detail'
+    
     id = serializers.CharField(source='file.hash')
+    url = serializers.SerializerMethodField('get_url')
     file = FileIdSerializer()
+    mimetype = serializers.CharField()
     metadata = MetaDataValueField()
-    #assets = AssetDescriptionSerializer(many=True)
     assets = AssetListingField(many=True)
 
-class FileDescriptionVerboseSerializer(DynamicFieldsSerializer):
-    id = serializers.CharField(source='file.hash')
-    file = FileIdSerializer()
-    metadata = MetaDataValueField()
+    def get_id(self, ref):
+        return ref.file.hash
+
+
+class FileDescriptionVerboseSerializer(FileDescriptionSerializer):
     assets = AssetDescriptionSerializer(many=True, exclude=('metadata', 'dependencies'))
 
 
