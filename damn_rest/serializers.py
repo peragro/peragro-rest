@@ -30,7 +30,12 @@ class DynamicFieldsSerializer(serializers.Serializer):
                             object.__excluded_fields = []
                         object.__excluded_fields.append(path[0])
                 else:
-                    recurse(object.fields[path[0]], path[1])
+                    if path[0] in object.fields:
+                        recurse(object.fields[path[0]], path[1])
+                    else:
+                        if not hasattr(object, '_DynamicFieldsSerializer__excluded_fields'):
+                            object.__excluded_fields = []
+                        object.__excluded_fields.append(path[0])
             
             for field in exclude:
                 recurse(self, field)
@@ -54,7 +59,7 @@ class UrlMixin:
             print('Exception', e)
             return ''
             
-            
+'''            
 class FileIdSerializer(DynamicFieldsSerializer):
     filename = serializers.CharField()
     hash = serializers.CharField(max_length=40)
@@ -79,16 +84,7 @@ class AssetListingField(UrlMixin, serializers.Serializer):
     def get_id(self, asset):
         return UniqueAssetId(asset.asset)
 
-
-class MetaDataValueField(serializers.RelatedField):
-    def to_native(self, metadata):
-        ret = {}
-        for key, value in metadata.items():
-            type_name = ['bool_value', 'int_value', 'double_value', 'string_value'][value.type-1]
-            ret[key] = (MetaDataType._VALUES_TO_NAMES[value.type], getattr(value, type_name, None)) 
-        return ret  
-    
-    
+ 
 class AssetDescriptionSerializer(UrlMixin, DynamicFieldsSerializer):
     view_name = 'assetreference-detail'
     
@@ -119,26 +115,42 @@ class FileDescriptionSerializer(UrlMixin, DynamicFieldsSerializer):
 
 class FileDescriptionVerboseSerializer(FileDescriptionSerializer):
     assets = AssetDescriptionSerializer(many=True, exclude=('metadata', 'dependencies'))
+'''
+
+class MetaDataValueField(serializers.RelatedField):
+    def to_native(self, metadata):
+        ret = {}
+        for key, value in metadata.items():
+            type_name = ['bool_value', 'int_value', 'double_value', 'string_value'][value.type-1]
+            ret[key] = (MetaDataType._VALUES_TO_NAMES[value.type], getattr(value, type_name, None)) 
+        return ret  
+
+
+class FileReferenceSerializer(DynamicFieldsSerializer):
+    id = serializers.IntegerField()
+    uuid = serializers.CharField(source='hash')
+    url = serializers.HyperlinkedIdentityField(view_name='filereference-detail', format='html')
+    filename = serializers.CharField()
+    hash = serializers.CharField(max_length=40)
+    base_name = serializers.SerializerMethodField('get_base_name')
+    
+    def get_base_name(self, file_id):
+        return os.path.basename(file_id.filename)
 
 
 class AssetReferenceSerializer(DynamicFieldsSerializer):
     id = serializers.IntegerField()
     uuid = serializers.CharField(source='slug')
     url = serializers.HyperlinkedIdentityField(view_name='assetreference-detail', format='html')
-    def to_native(self, asset):
-        ret = super(AssetReferenceSerializer, self).to_native(asset)
-        ret['asset'] = {'mimetype': asset.mimetype, 'subname': asset.subname}
-        ret['asset']['file'] = {'hash': asset.file_id_hash, 'filename': asset.file_id_filename}
-        return ret
+    subname = serializers.CharField()
+    mimetype = serializers.CharField()
+    file = FileReferenceSerializer()
 
 
-class AssetReferenceVerboseSerializer(DynamicFieldsSerializer):
-    id = serializers.IntegerField()
-    uuid = serializers.CharField(source='slug')
-    url = serializers.HyperlinkedIdentityField(view_name='assetreference-detail', format='html')
-    def to_native(self, asset):
-        ret = super(AssetReferenceVerboseSerializer, self).to_native(asset)
-        ret['asset'] = {'mimetype': asset.mimetype, 'subname': asset.subname}
-        ret['asset']['file'] = {'hash': asset.file_id_hash, 'filename': asset.file_id_filename}
-        ret['metadata'] = asset.metadata
-        return ret        
+class FileReferenceVerboseSerializer(FileReferenceSerializer):
+    assets = AssetReferenceSerializer(many=True, exclude=('file',))
+    metadata = MetaDataValueField()
+
+class AssetReferenceVerboseSerializer(AssetReferenceSerializer):
+    metadata = MetaDataValueField()
+      

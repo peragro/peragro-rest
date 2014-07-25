@@ -8,8 +8,8 @@ from rest_framework_extensions.routers import ExtendedDefaultRouter
 
 router = ExtendedDefaultRouter()
 
-router.register(r'files', views.FileDescriptionViewSet, base_name = 'file')
-assets_router = router.register(r'assets', views.AssetDescriptionViewSet, base_name = 'assetreference')
+router.register(r'files', views.FileReferenceViewSet)
+assets_router = router.register(r'assets', views.AssetReferenceViewSet)
 
 assets_router.register(r'revisions', views.AssetRevisionsViewSet, base_name='assetreferences-revision', parents_query_lookups=['asset'])
 

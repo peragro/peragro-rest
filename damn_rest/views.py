@@ -1,4 +1,6 @@
 import os
+import tempfile
+
 from django.shortcuts import get_object_or_404
 from django.http import StreamingHttpResponse
 from django.contrib.auth.models import User, Group
@@ -9,14 +11,19 @@ from rest_framework.response import Response
 from rest_framework.decorators import action, link
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
-from damn_rest.serializers import FileDescriptionSerializer, FileDescriptionVerboseSerializer, AssetReferenceSerializer, AssetReferenceVerboseSerializer
+from damn_rest import serializers
 
 
 from rest_framework.parsers import MultiPartParser, FileUploadParser
 from rest_framework import authentication, permissions
 
-from damn_rest.models import AssetReference
+from django_project.models import Project
+from damn_rest.models import FileReference, AssetReference
 
+from damn_at import Analyzer
+from damn_at.utilities import calculate_hash_for_file
+
+# curl -i -F filename=test2 -F file=@thumbs_up-600x600.png http://localhost:8000/projects/2/upload
 class FileUploadView(APIView):
     parser_classes = (MultiPartParser,)
     
@@ -24,122 +31,68 @@ class FileUploadView(APIView):
     #permission_classes = (permissions.IsAdminUser,)
 
     def post(self, request, project_name):
-        print('FileUploadView', project_name)
-        print('FileUploadView', request.FILES)
-        file_obj = request.FILES['file']
-        print(dir(file_obj))
-        print(file_obj.name)
-        print(file_obj.content_type)
-        # ...
-        # do some staff with uploaded file
-        # ...
-        import tempfile
-        with tempfile.NamedTemporaryFile(delete=False) as destination:
-          print destination.name
-          for chunk in file_obj.chunks():
-              destination.write(chunk)
-          destination.flush()    
-          from damn_at import mimetypes
-          print mimetypes.guess_type(destination.name, False)
-          
-          import logging
-          from damn_at import MetaDataStore, Analyzer
-          from damn_at.analyzer import analyze
-          logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
-          
-          analyzer = Analyzer()
-          metadatastore = MetaDataStore('/tmp/damn')  
-          output = logging.getLogger('damn-at_analyzer')
-          
-          descr = analyze(analyzer, metadatastore, destination.name, output, forcereanalyze=True)
-          print descr
-          for asset in descr.assets:
-            ref = AssetReference.objects.get_or_create(asset)
-        return Response(status=204)
-
-
-
-class FileDescriptionViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    """ 
-    serializer_class = FileDescriptionSerializer
-    paginate_by = 2
-    
-    def get_queryset(self):
-        from damn_at import MetaDataStore
-        path = '/tmp/damn'
-        store = MetaDataStore(path)
-        references = []
-        for filename in os.listdir(path):
-            file_descr = store.get_metadata(path, filename)
-            references.append(file_descr)
-        return references
+        project = get_object_or_404(Project, pk=project_name)
         
-    def get_object(self, queryset=None):
-        pass
-    
-    @link(permission_classes=[])
-    def full(self, request, pk=None):
-        from damn_at import MetaDataStore
-        path = '/tmp/damn'
-        store = MetaDataStore(path)
-        file_descr = store.get_metadata(path, pk)
+        if 'filename' not in request.POST or 'file' not in request.FILES:
+            raise Response('Malformed request, needs to contain filename and file fields', status=400)
+        
+        filename = request.POST['filename']   
+        file_obj = request.FILES['file']
+         
+        #Write file to temporary location
+        with tempfile.NamedTemporaryFile(delete=False) as destination:
+            for chunk in file_obj.chunks():
+                destination.write(chunk)
+            destination.flush() 
 
-        serializer = FileDescriptionVerboseSerializer(file_descr, context={'request': request})
+            hash = calculate_hash_for_file(destination.name)
 
-        return Response(serializer.data)
+            files_dir = '/tmp/damn/files'
+            if not os.path.exists(files_dir):
+                os.makedirs(files_dir) 
+            new_path = os.path.join(files_dir, hash)
+            os.rename(destination.name, new_path)
 
-    def retrieve(self, request, pk=None):
-        from damn_at import MetaDataStore
-        from damn_at.metadatastore import MetaDataStoreFileException
-        path = '/tmp/damn'
-        store = MetaDataStore(path)
-        try:
-            file_descr = store.get_metadata(path, pk)
+            analyzer = Analyzer()
+            file_descr = analyzer.analyze_file(new_path)
+            file_descr.file.hash = hash
 
-            serializer = FileDescriptionSerializer(file_descr, context={'request': request})
-            return Response(serializer.data)
-        except MetaDataStoreFileException as mdsfe:
-            return Response(mdsfe.msg, status=404)
-    
-    @link(permission_classes=[])
-    def download(self, request, pk=None):
-        from damn_at import MetaDataStore
-        from damn_at.metadatastore import MetaDataStoreFileException
-        path = '/tmp/damn'
-        store = MetaDataStore(path)
-        try:
-            file_descr = store.get_metadata(path, pk)
+            file_ref = FileReference.objects.update_or_create(request.user, project, filename, file_descr)
 
-            fsock = open(file_descr.file.filename, 'rb')
-            return StreamingHttpResponse(fsock, content_type=file_descr.mimetype)
-            
-        except MetaDataStoreFileException as mdsfe:
-            return Response(status=404)
+            return Response('FileReference with id %s created'%file_ref.id, status=204)
 
 
-class AssetDescriptionViewSet(viewsets.ReadOnlyModelViewSet):
+class FileReferenceViewSet(viewsets.ReadOnlyModelViewSet):
     """
     """ 
+    queryset = FileReference.objects.all()
+    slug_field = 'hash'
     
     def get_serializer_class(self):
       if 'pk' in self.kwargs:
-          return AssetReferenceVerboseSerializer
-      return AssetReferenceSerializer
+          return serializers.FileReferenceVerboseSerializer
+      return serializers.FileReferenceSerializer
     
-    def get_queryset(self):
-        return AssetReference.objects.all()
+    @link(permission_classes=[])
+    def download(self, request, pk=None):
+        obj = self.get_object()
         
-    def get_object(self):
-        queryset = self.get_queryset()
-        if self.kwargs['pk'].isnumeric():
-            filter = {'id': self.kwargs['pk']}
-        else:
-            filter = {'slug': self.kwargs['pk']}
+        hash = obj.hash
+        path = '/tmp/damn/files'
+        fsock = open(os.path.join(path, hash), 'rb')
+        return StreamingHttpResponse(fsock, content_type=file_descr.mimetype)
 
-        obj = get_object_or_404(queryset, **filter)
-        self.check_object_permissions(self.request, obj)
-        return obj
+
+class AssetReferenceViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    """ 
+    queryset = AssetReference.objects.all()
+    slug_field = 'slug'
+    
+    def get_serializer_class(self):
+      if 'pk' in self.kwargs:
+          return serializers.AssetReferenceVerboseSerializer
+      return serializers.AssetReferenceSerializer
     
     @link(permission_classes=[])
     def tasks(self, request, pk):
@@ -171,8 +124,8 @@ class AssetDescriptionViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class AssetRevisionsViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
-    from django_project import serializers
-    serializer_class = serializers.VersionSerializer
+    from django_project import serializers as dp_serializers
+    serializer_class = dp_serializers.VersionSerializer
     queryset = AssetReference.objects.all()
     def get_queryset(self):
         qs = super(AssetRevisionsViewSet, self).get_queryset()[0].versions() 
@@ -186,26 +139,31 @@ class AssetRevisionsViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         
     @link(permission_classes=[])
     def preview(self, request, parent_lookup_asset, pk):
-        obj = self.get_queryset().get(pk=pk)
-        
-        
-        from damn_at import MetaDataStore
+        version = self.get_queryset().get(pk=pk)
+
         from damn_at.utilities import find_asset_id_in_file_descr
-        path = '/tmp/damn'
-        store = MetaDataStore(path)
-        asset = obj.object_version.object
-        file_descr = store.get_metadata(path, asset.file_id_hash)
+        asset = version.object_version.object
+        
+        #Why doesn't it restore the related fields?
+        #file = asset.file
+        #file_descr = file.description
+        # Begin work-around
+        file_version = version.revision.version_set.exclude(pk=version.pk).all()[0]
+        file = file_version.object_version.object
+        file_descr = file.description
+        # End work-around
+        
+        file_descr.file.filename = os.path.join('/tmp/damn/files', file.hash)
         
         asset_id = find_asset_id_in_file_descr(file_descr, asset.subname, asset.mimetype)
         
         paths = transcode(file_descr, asset_id)
-        print paths
-        fsock = open(os.path.join('/tmp/transcoded/', paths['256x256'][0]), 'rb')
+        fsock = open(os.path.join('/tmp/damn/transcoded/', paths['256x256'][0]), 'rb')
 
         return StreamingHttpResponse(fsock, content_type='image/png')
         
 
-def transcode(file_descr, asset_id, dst_mimetype='image/png', options={}, path='/tmp/transcoded/'):
+def transcode(file_descr, asset_id, dst_mimetype='image/png', options={}, path='/tmp/damn/transcoded/'):
     """
     Transcode the given asset_id to the destination mimetype
     and return the paths to the transcoded files.
