@@ -16,6 +16,14 @@ def create_auth_token(sender, instance=None, created=False, **kwargs):
 import reversion
 from django.db import transaction
 class VersionMixin(object):
+    def date_created(self):
+        version_list = reversion.get_for_object(self)
+        return version_list.latest('revision__date_created').revision.date_created
+        
+    def latest_version(self):
+        version_list = reversion.get_for_object(self)
+        return version_list.latest('revision__date_created').pk
+        
     def versions(self):
         version_list = reversion.get_for_object(self)
         return version_list

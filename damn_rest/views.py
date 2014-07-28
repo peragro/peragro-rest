@@ -124,12 +124,17 @@ class AssetReferenceViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class AssetRevisionsViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
-    from django_project import serializers as dp_serializers
-    serializer_class = dp_serializers.VersionSerializer
     queryset = AssetReference.objects.all()
+    
+    def get_serializer_class(self):
+      if 'pk' in self.kwargs:
+          return serializers.AssetVersionVerboseSerializer
+      return serializers.AssetVersionSerializer
+    
     def get_queryset(self):
         qs = super(AssetRevisionsViewSet, self).get_queryset()[0].versions() 
         return qs
+        
     def get_parents_query_dict(self):
         if self.kwargs['parent_lookup_asset'].isnumeric():
             filter = {'id': self.kwargs['parent_lookup_asset']}
