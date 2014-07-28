@@ -107,18 +107,15 @@ class AssetReferenceViewSet(viewsets.ReadOnlyModelViewSet):
     def preview(self, request, pk):
         obj = self.get_object()
         
-        
-        from damn_at import MetaDataStore
         from damn_at.utilities import find_asset_id_in_file_descr
-        path = '/tmp/damn'
-        store = MetaDataStore(path)
-        file_descr = store.get_metadata(path, obj.file_id_hash)
+
+        file_descr = obj.file.description
         
         asset_id = find_asset_id_in_file_descr(file_descr, obj.subname, obj.mimetype)
         
         paths = transcode(file_descr, asset_id)
         print paths
-        fsock = open(os.path.join('/tmp/transcoded/', paths['256x256'][0]), 'rb')
+        fsock = open(os.path.join('/tmp/damn/transcoded/', paths['256x256'][0]), 'rb')
 
         return StreamingHttpResponse(fsock, content_type='image/png')
 
