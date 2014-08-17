@@ -59,63 +59,6 @@ class UrlMixin:
             print('Exception', e)
             return ''
             
-'''            
-class FileIdSerializer(DynamicFieldsSerializer):
-    filename = serializers.CharField()
-    hash = serializers.CharField(max_length=40)
-    base_name = serializers.SerializerMethodField('get_base_name')
-    
-    def get_base_name(self, file_id):
-        return os.path.basename(file_id.filename)
-
-
-class AssetIdSerializer(DynamicFieldsSerializer):
-    subname = serializers.CharField()
-    mimetype = serializers.CharField()
-    file = FileIdSerializer()
-
-
-class AssetListingField(UrlMixin, serializers.Serializer):
-    view_name = 'assetreference-detail'
-    
-    id = serializers.SerializerMethodField('get_id')
-    url = serializers.SerializerMethodField('get_url')
-    
-    def get_id(self, asset):
-        return UniqueAssetId(asset.asset)
-
- 
-class AssetDescriptionSerializer(UrlMixin, DynamicFieldsSerializer):
-    view_name = 'assetreference-detail'
-    
-    id = serializers.SerializerMethodField('get_id')
-    url = serializers.SerializerMethodField('get_url')
-    asset = AssetIdSerializer()
-    metadata = MetaDataValueField()
-    #dependencies = AssetListingField(many=True)
-    dependencies = AssetIdSerializer(many=True)
-    
-    def get_id(self, asset):
-        return UniqueAssetId(asset.asset)
-
-
-class FileDescriptionSerializer(UrlMixin, DynamicFieldsSerializer):
-    view_name = 'file-detail'
-    
-    id = serializers.CharField(source='file.hash')
-    url = serializers.SerializerMethodField('get_url')
-    file = FileIdSerializer()
-    mimetype = serializers.CharField()
-    metadata = MetaDataValueField()
-    assets = AssetListingField(many=True)
-
-    def get_id(self, ref):
-        return ref.file.hash
-
-
-class FileDescriptionVerboseSerializer(FileDescriptionSerializer):
-    assets = AssetDescriptionSerializer(many=True, exclude=('metadata', 'dependencies'))
-'''
 
 class MetaDataValueField(serializers.RelatedField):
     def to_native(self, metadata):
@@ -145,12 +88,49 @@ class AssetReferenceSerializer(DynamicFieldsSerializer):
     subname = serializers.CharField()
     mimetype = serializers.CharField()
     file = FileReferenceSerializer()
+    date_created = serializers.DateField()
+    latest_version = serializers.IntegerField()
+    nr_of_versions = serializers.IntegerField()
 
 
 class FileReferenceVerboseSerializer(FileReferenceSerializer):
     assets = AssetReferenceSerializer(many=True, exclude=('file',))
     metadata = MetaDataValueField()
 
+
 class AssetReferenceVerboseSerializer(AssetReferenceSerializer):
     metadata = MetaDataValueField()
-      
+
+
+class AssetVersionSerializer(DynamicFieldsSerializer):  
+    id = serializers.IntegerField()
+    def to_native(self, version):
+        ver = super(AssetVersionSerializer, self).to_native(version)
+        from rest_framework.reverse import reverse
+        kwargs = {'pk': version.pk, 'parent_lookup_asset': version.object_id}
+        ver['url'] = reverse('assetreferences-revision-detail', kwargs=kwargs, request=self.context.get('request', None), format=None)
+        
+        ver['revision'] = {}
+        #ver['revision']['id'] = version.revision_id
+        ver['revision']['comment'] = version.revision.comment
+        if version.revision.user:
+            ver['revision']['editor'] = version.revision.user.username
+        else:
+            ver['revision']['editor'] = 'Anonymous'
+        ver['revision']['date_created'] = version.revision.date_created
+        return ver
+
+
+class AssetVersionVerboseSerializer(AssetVersionSerializer):   
+    def to_native(self, version):
+        ver = super(AssetVersionVerboseSerializer, self).to_native(version)
+        
+        asset = version.object_version.object
+        #Why doesn't it restore the related fields?
+        # Begin work-around
+        file_version = version.revision.version_set.exclude(pk=version.pk).all()[0]
+        asset.file = file_version.object_version.object
+        # End work-around
+        exclude = ('date_created', 'latest_version', 'nr_of_versions', )
+        ver['asset'] = AssetReferenceVerboseSerializer(asset, context=self.context, exclude=exclude).data
+        return ver
