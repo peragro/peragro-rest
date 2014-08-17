@@ -131,11 +131,16 @@ class AssetRevisionsViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         qs = super(AssetRevisionsViewSet, self).get_queryset()[0].versions() 
         return qs
     def get_parents_query_dict(self):
-        if self.kwargs['parent_lookup_asset'].isnumeric():
-            filter = {'id': self.kwargs['parent_lookup_asset']}
-        else:
-            filter = {'slug': self.kwargs['parent_lookup_asset']}
-        return filter
+        filters = {}
+        from rest_framework_extensions.settings import extensions_api_settings
+        for kwarg_name in self.kwargs:
+            if kwarg_name.startswith(extensions_api_settings.DEFAULT_PARENT_LOOKUP_KWARG_NAME_PREFIX):
+                if self.kwargs[kwarg_name].isnumeric():
+                    filter = {'id': self.kwargs[kwarg_name]}
+                else:
+                    filter = {'slug': self.kwargs[kwarg_name]}
+                filters.update(filter)
+        return filters
         
     @link(permission_classes=[])
     def preview(self, request, parent_lookup_asset, pk):
