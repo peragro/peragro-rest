@@ -62,7 +62,7 @@ class FileUploadView(APIView):
             return Response('FileReference with id %s created'%file_ref.id, status=204)
 
 
-class FileReferenceViewSet(viewsets.ReadOnlyModelViewSet):
+class FileReferenceViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
     """
     """ 
     queryset = FileReference.objects.all()
@@ -83,7 +83,7 @@ class FileReferenceViewSet(viewsets.ReadOnlyModelViewSet):
         return StreamingHttpResponse(fsock, content_type=file_descr.mimetype)
 
 
-class AssetReferenceViewSet(viewsets.ReadOnlyModelViewSet):
+class AssetReferenceViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
     """
     """ 
     queryset = AssetReference.objects.all()

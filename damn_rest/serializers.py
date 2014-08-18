@@ -68,17 +68,19 @@ class MetaDataValueField(serializers.RelatedField):
             ret[key] = (MetaDataType._VALUES_TO_NAMES[value.type], getattr(value, type_name, None)) 
         return ret  
 
+from django_project.serializers import ExtendedHyperlinkedModelSerializer
 
-class FileReferenceSerializer(DynamicFieldsSerializer):
-    id = serializers.IntegerField()
+class FileReferenceSerializer(ExtendedHyperlinkedModelSerializer):
     uuid = serializers.CharField(source='hash')
-    url = serializers.HyperlinkedIdentityField(view_name='filereference-detail', format='html')
-    filename = serializers.CharField()
-    hash = serializers.CharField(max_length=40)
     base_name = serializers.SerializerMethodField('get_base_name')
     
     def get_base_name(self, file_id):
         return os.path.basename(file_id.filename)
+        
+    class Meta:
+        from damn_rest.models import FileReference
+        model = FileReference
+        exclude = ('_description', )
 
 
 class AssetReferenceSerializer(DynamicFieldsSerializer):
