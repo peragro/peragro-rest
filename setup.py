@@ -11,7 +11,7 @@ config = {
     'author_email': 'No, thanks',
     'version': '0.1',
     'test_suite': 'tests.suite',
-    'install_requires': ['damn_index', 'pylint', 'django-cors-headers'],
+    'install_requires': ['damn_index', 'django_project'],
     'test_requires': [],
     'packages': ['damn_rest'],
     'scripts': [],
