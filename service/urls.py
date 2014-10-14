@@ -8,23 +8,25 @@ from rest_framework_extensions.routers import ExtendedDefaultRouter
 
 router = ExtendedDefaultRouter()
 
-router.register(r'files', views.FileReferenceViewSet)
-assets_router = router.register(r'assets', views.AssetReferenceViewSet)
+# File router and its nested routes
+files_router = router.register(r'files', views.FileReferenceViewSet)
+files_router.register(r'assets', views.AssetReferenceViewSet, base_name='files-asset', parents_query_lookups=['file'])
 
+# Asset router and its nested routes
+assets_router = router.register(r'assets', views.AssetReferenceViewSet)
 assets_router.register(r'revisions', views.AssetRevisionsViewSet, base_name='assetreferences-revision', parents_query_lookups=['asset'])
 
 import django_project
 from django_project.urls import router as routerp
 from django_project.urls import projects_router
 
+# Project router and its nested routes
 projects_router.register(r'files', views.FileReferenceViewSet, base_name='projects-filereference', parents_query_lookups=['project'])
 projects_router.register(r'assets', views.AssetReferenceViewSet, base_name='projects-assetreference', parents_query_lookups=['file__project'])
 
+# Extend our registery with the django_project registery
 router.registry.extend(routerp.registry)
 
-    
-# Wire up our API using automatic URL routing.
-# Additionally, we include login URLs for the browseable API.
 urlpatterns = patterns('',
     url(r'^', include(router.urls)),
     
