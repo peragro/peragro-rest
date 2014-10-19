@@ -12,15 +12,15 @@ def UniqueAssetId(asset_id):
     return utilities.unique_asset_id_reference(asset_id)
 
 
-class DynamicFieldsSerializer(serializers.Serializer):        
+class DynamicFieldsSerializer(serializers.Serializer):
     def __init__(self, *args, **kwargs):
         # Don't pass the 'fields' arg up to the superclass
         exclude = kwargs.pop('exclude', None)
-        
+
         # Instantiate the superclass normally
         super(DynamicFieldsSerializer, self).__init__(*args, **kwargs)
 
-        if exclude:      
+        if exclude:
             # Drop any fields that are not specified in the `fields` argument.
             def recurse(object, field):
                 path = field.split('.', 1)
@@ -36,10 +36,10 @@ class DynamicFieldsSerializer(serializers.Serializer):
                         if not hasattr(object, '_DynamicFieldsSerializer__excluded_fields'):
                             object.__excluded_fields = []
                         object.__excluded_fields.append(path[0])
-            
+
             for field in exclude:
                 recurse(self, field)
-                
+
     def to_native(self, obj):
         ret = super(DynamicFieldsSerializer, self).to_native(obj)
         fields = getattr(self, '_DynamicFieldsSerializer__excluded_fields', [])
@@ -58,25 +58,34 @@ class UrlMixin:
         except Exception as e:
             print('Exception', e)
             return ''
-            
+
 
 class MetaDataValueField(serializers.RelatedField):
     def to_native(self, metadata):
         ret = {}
         for key, value in metadata.items():
             type_name = ['bool_value', 'int_value', 'double_value', 'string_value'][value.type-1]
-            ret[key] = (MetaDataType._VALUES_TO_NAMES[value.type], getattr(value, type_name, None)) 
-        return ret  
+            ret[key] = (MetaDataType._VALUES_TO_NAMES[value.type], getattr(value, type_name, None))
+        return ret
 
-from django_project.serializers import ExtendedHyperlinkedModelSerializer
+from django_project.serializers import (
+  HyperlinkedRelatedMethod,
+  ExtendedHyperlinkedModelSerializer,
+  GenericForeignKeyMixin
+)
 
-class FileReferenceSerializer(ExtendedHyperlinkedModelSerializer):
+class FileReferenceSerializer(GenericForeignKeyMixin, ExtendedHyperlinkedModelSerializer):
     uuid = serializers.CharField(source='hash')
     base_name = serializers.SerializerMethodField('get_base_name')
-    
+
+    author = HyperlinkedRelatedMethod()
+    date_modified = serializers.DateField()
+    latest_version = serializers.IntegerField()
+    nr_of_versions = serializers.IntegerField()
+
     def get_base_name(self, file_id):
         return os.path.basename(file_id.filename)
-        
+
     class Meta:
         from damn_rest.models import FileReference
         model = FileReference
@@ -90,7 +99,7 @@ class AssetReferenceSerializer(DynamicFieldsSerializer):
     subname = serializers.CharField()
     mimetype = serializers.CharField()
     file = FileReferenceSerializer()
-    date_created = serializers.DateField()
+    date_modified = serializers.DateField()
     latest_version = serializers.IntegerField()
     nr_of_versions = serializers.IntegerField()
 
@@ -104,14 +113,14 @@ class AssetReferenceVerboseSerializer(AssetReferenceSerializer):
     metadata = MetaDataValueField()
 
 
-class AssetVersionSerializer(DynamicFieldsSerializer):  
+class AssetVersionSerializer(DynamicFieldsSerializer):
     id = serializers.IntegerField()
     def to_native(self, version):
         ver = super(AssetVersionSerializer, self).to_native(version)
         from rest_framework.reverse import reverse
         kwargs = {'pk': version.pk, 'parent_lookup_asset': version.object_id}
         ver['url'] = reverse('assetreferences-revision-detail', kwargs=kwargs, request=self.context.get('request', None), format=None)
-        
+
         ver['revision'] = {}
         #ver['revision']['id'] = version.revision_id
         ver['revision']['comment'] = version.revision.comment
@@ -123,16 +132,16 @@ class AssetVersionSerializer(DynamicFieldsSerializer):
         return ver
 
 
-class AssetVersionVerboseSerializer(AssetVersionSerializer):   
+class AssetVersionVerboseSerializer(AssetVersionSerializer):
     def to_native(self, version):
         ver = super(AssetVersionVerboseSerializer, self).to_native(version)
-        
+
         asset = version.object_version.object
         #Why doesn't it restore the related fields?
         # Begin work-around
         file_version = version.revision.version_set.exclude(pk=version.pk).all()[0]
         asset.file = file_version.object_version.object
         # End work-around
-        exclude = ('date_created', 'latest_version', 'nr_of_versions', )
+        exclude = ('date_modified', 'latest_version', 'nr_of_versions', )
         ver['asset'] = AssetReferenceVerboseSerializer(asset, context=self.context, exclude=exclude).data
         return ver

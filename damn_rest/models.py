@@ -16,22 +16,26 @@ def create_auth_token(sender, instance=None, created=False, **kwargs):
 import reversion
 from django.db import transaction
 class VersionMixin(object):
-    def date_created(self):
+    def author(self):
+        version_list = reversion.get_for_object(self)
+        return version_list.latest('revision__date_created').revision.user
+
+    def date_modified(self):
         version_list = reversion.get_for_object(self)
         return version_list.latest('revision__date_created').revision.date_created
-        
+
     def latest_version(self):
         version_list = reversion.get_for_object(self)
         return version_list.latest('revision__date_created').pk
-        
+
     def versions(self):
         version_list = reversion.get_for_object(self)
         return version_list
-        
+
     def nr_of_versions(self):
         version_list = reversion.get_for_object(self)
         return len(version_list)
-    
+
     def save_revision(self, user, comment, *args, **kwargs):
         with transaction.atomic(), reversion.create_revision():
             self.save()
@@ -61,7 +65,7 @@ class DescriptionModel(models.Model):
             ret = DeserializeThriftMsg(self._description_model(), self._description, TJSONProtocol)
             return ret
         return None
-        
+
     @description.setter
     def description(self, descr):
         self._description = SerializeThriftMsg(descr, TJSONProtocol)
@@ -76,7 +80,7 @@ class FileReferenceManager(models.Manager):
             except FileReference.DoesNotExist:
                 fileref = FileReference(project=project, filename=filename, hash='', mimetype='', _description='')
                 created = True
-                
+
             if not created and fileref.hash == file_description.file.hash:
                 return fileref
 
@@ -85,7 +89,7 @@ class FileReferenceManager(models.Manager):
             fileref.description = file_description
             #fileref.save_revision(user, 'Initial revision' if created else 'Updated file')
             fileref.save()
-            
+
             assetids = []
             if file_description.assets:
                 assetids = [(asset_description.asset.subname, asset_description.asset.mimetype) for asset_description in file_description.assets]
@@ -102,24 +106,24 @@ class FileReferenceManager(models.Manager):
                 for asset_description in file_description.assets:
                     print 'FileReferenceManager: updating asset', asset_description.asset
                     AssetReference.objects.update_or_create(user, fileref, asset_description)
-       
+
             if user.is_authenticated():
                 reversion.set_user(user)
             reversion.set_comment('Initial revision' if created else 'Updated file')
-            
+
             return fileref
-      
+
 
 class FileReference(VersionMixin, DescriptionModel):
     _description_model = FileDescription
-    
+
     project = models.ForeignKey(Project, related_name='files')
     filename = models.TextField()
     hash = models.CharField(max_length=128, db_index=True)
     mimetype = models.CharField(max_length=255)
-    
+
     objects = FileReferenceManager()
-    
+
     @property
     def metadata(self):
         return self.description.metadata
@@ -146,26 +150,26 @@ class AssetReferenceManager(models.Manager):
 
 class AssetReference(VersionMixin, ObjectTaskMixin, DescriptionModel):
     _description_model = AssetDescription
-    
+
     file = models.ForeignKey(FileReference, related_name='assets')
     subname = models.CharField(max_length=255)
     mimetype = models.CharField(max_length=255)
-    
+
     slug = models.TextField(db_index=True)
-    
+
     objects = AssetReferenceManager()
-    
+
     class Meta:
       unique_together = ('file', 'subname', 'mimetype')
-      
+
     def save(self, *args, **kwargs):
       self.slug = unique_asset_id_reference_from_fields(self.file.hash, self.subname, self.mimetype)
       super(AssetReference, self).save(*args, **kwargs)
-      
+
     @property
     def metadata(self):
         return self.description.metadata
-        
+
     @property
     def dependencies(self):
         return self.description.dependencies
