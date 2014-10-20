@@ -78,7 +78,9 @@ class FileReferenceSerializer(GenericForeignKeyMixin, ExtendedHyperlinkedModelSe
     uuid = serializers.CharField(source='hash')
     base_name = serializers.SerializerMethodField('get_base_name')
 
-    author = HyperlinkedRelatedMethod()
+    creator = HyperlinkedRelatedMethod()
+    modifier = HyperlinkedRelatedMethod()
+    date_created = serializers.DateField()
     date_modified = serializers.DateField()
     latest_version = serializers.IntegerField()
     nr_of_versions = serializers.IntegerField()
