@@ -12,43 +12,6 @@ def UniqueAssetId(asset_id):
     return utilities.unique_asset_id_reference(asset_id)
 
 
-class DynamicFieldsSerializer(serializers.Serializer):
-    def __init__(self, *args, **kwargs):
-        # Don't pass the 'fields' arg up to the superclass
-        exclude = kwargs.pop('exclude', None)
-
-        # Instantiate the superclass normally
-        super(DynamicFieldsSerializer, self).__init__(*args, **kwargs)
-
-        if exclude:
-            # Drop any fields that are not specified in the `fields` argument.
-            def recurse(object, field):
-                path = field.split('.', 1)
-                if len(path) == 1:
-                    if path[0] in object.fields:
-                        if not hasattr(object, '_DynamicFieldsSerializer__excluded_fields'):
-                            object.__excluded_fields = []
-                        object.__excluded_fields.append(path[0])
-                else:
-                    if path[0] in object.fields:
-                        recurse(object.fields[path[0]], path[1])
-                    else:
-                        if not hasattr(object, '_DynamicFieldsSerializer__excluded_fields'):
-                            object.__excluded_fields = []
-                        object.__excluded_fields.append(path[0])
-
-            for field in exclude:
-                recurse(self, field)
-
-    def to_native(self, obj):
-        ret = super(DynamicFieldsSerializer, self).to_native(obj)
-        fields = getattr(self, '_DynamicFieldsSerializer__excluded_fields', [])
-        for field in fields:
-            if field in ret:
-                del ret[field]
-        return ret
-
-
 class UrlMixin:
     def get_url(self, obj):
         try:
@@ -94,28 +57,38 @@ class FileReferenceSerializer(GenericForeignKeyMixin, ExtendedHyperlinkedModelSe
         exclude = ('_description', )
 
 
-class AssetReferenceSerializer(DynamicFieldsSerializer):
+class AssetReferenceSerializer(GenericForeignKeyMixin, ExtendedHyperlinkedModelSerializer):
     id = serializers.IntegerField()
     uuid = serializers.CharField(source='slug')
     url = serializers.HyperlinkedIdentityField(view_name='assetreference-detail', format='html')
     subname = serializers.CharField()
     mimetype = serializers.CharField()
-    file = FileReferenceSerializer()
+    file = serializers.HyperlinkedRelatedField(view_name='filereference-detail')
+    
+    creator = HyperlinkedRelatedMethod()
+    modifier = HyperlinkedRelatedMethod()
+    date_created = serializers.DateField()
     date_modified = serializers.DateField()
     latest_version = serializers.IntegerField()
     nr_of_versions = serializers.IntegerField()
+    
+    class Meta:
+        from damn_rest.models import AssetReference
+        model = AssetReference
+        exclude = ('_description',)
 
 
 class FileReferenceVerboseSerializer(FileReferenceSerializer):
-    assets = AssetReferenceSerializer(many=True, exclude=('file',))
+    assets = AssetReferenceSerializer(many=True)
     metadata = MetaDataValueField()
 
 
 class AssetReferenceVerboseSerializer(AssetReferenceSerializer):
+    file = FileReferenceSerializer()
     metadata = MetaDataValueField()
+    
 
-
-class AssetVersionSerializer(DynamicFieldsSerializer):
+class AssetVersionSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     def to_native(self, version):
         ver = super(AssetVersionSerializer, self).to_native(version)
