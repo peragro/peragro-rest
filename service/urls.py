@@ -16,6 +16,9 @@ files_router.register(r'assets', views.AssetReferenceViewSet, base_name='files-a
 assets_router = router.register(r'assets', views.AssetReferenceViewSet)
 assets_router.register(r'revisions', views.AssetRevisionsViewSet, base_name='assetreferences-revision', parents_query_lookups=['asset'])
 
+# ReferenceTask router
+router.register(r'referencetasks', views.ReferenceTasksViewSet, base_name='referencetasks')
+
 import django_project
 from django_project.urls import router as routerp
 from django_project.urls import projects_router
@@ -29,14 +32,13 @@ router.registry.extend(routerp.registry)
 
 urlpatterns = patterns('',
     url(r'^', include(router.urls)),
-    
+
     url(r'^', include(django_project.urls)),
-    
+
     url(r'^api-auth/', include('rest_framework.urls', namespace='rest_framework')),
     url(r'^api-token-auth/', 'rest_framework.authtoken.views.obtain_auth_token'),
-    
+
     url(r'^projects/(?P<project_name>\w+)/upload/', views.FileUploadView.as_view(), name='upload_file'),
-    
+
     url(r'^admin/', include(admin.site.urls)),
 )
-

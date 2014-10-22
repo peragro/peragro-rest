@@ -37,6 +37,19 @@ from django_project.serializers import (
   GenericForeignKeyMixin
 )
 
+class BaseSerializer(serializers.Serializer):
+    def __init__(self, *args, **kwargs):
+        self._exclude_fields = kwargs.get('exclude', [])
+        print kwargs
+        if 'exclude' in kwargs:
+            kwargs.pop('exclude')
+        super(BaseSerializer, self).__init__(*args, **kwargs)
+    def get_fields(self):
+        fields = super(BaseSerializer, self).get_fields()
+        for field in self._exclude_fields:
+            fields.pop(field)
+        return fields
+
 class FileReferenceSerializer(GenericForeignKeyMixin, ExtendedHyperlinkedModelSerializer):
     uuid = serializers.CharField(source='hash')
     base_name = serializers.SerializerMethodField('get_base_name')
@@ -57,21 +70,21 @@ class FileReferenceSerializer(GenericForeignKeyMixin, ExtendedHyperlinkedModelSe
         exclude = ('_description', )
 
 
-class AssetReferenceSerializer(GenericForeignKeyMixin, ExtendedHyperlinkedModelSerializer):
+class AssetReferenceSerializer(BaseSerializer, GenericForeignKeyMixin, ExtendedHyperlinkedModelSerializer):
     id = serializers.IntegerField()
     uuid = serializers.CharField(source='slug')
     url = serializers.HyperlinkedIdentityField(view_name='assetreference-detail', format='html')
     subname = serializers.CharField()
     mimetype = serializers.CharField()
     file = serializers.HyperlinkedRelatedField(view_name='filereference-detail')
-    
+
     creator = HyperlinkedRelatedMethod()
     modifier = HyperlinkedRelatedMethod()
     date_created = serializers.DateField()
     date_modified = serializers.DateField()
     latest_version = serializers.IntegerField()
     nr_of_versions = serializers.IntegerField()
-    
+
     class Meta:
         from damn_rest.models import AssetReference
         model = AssetReference
@@ -86,7 +99,7 @@ class FileReferenceVerboseSerializer(FileReferenceSerializer):
 class AssetReferenceVerboseSerializer(AssetReferenceSerializer):
     file = FileReferenceSerializer()
     metadata = MetaDataValueField()
-    
+
 
 class AssetVersionSerializer(serializers.Serializer):
     id = serializers.IntegerField()
@@ -120,3 +133,19 @@ class AssetVersionVerboseSerializer(AssetVersionSerializer):
         exclude = ('date_modified', 'latest_version', 'nr_of_versions', )
         ver['asset'] = AssetReferenceVerboseSerializer(asset, context=self.context, exclude=exclude).data
         return ver
+
+
+class ObjectTaskSerializer(serializers.Serializer):
+    def to_native(self, objecttask):
+        #exclude = ('creator', 'modifier', 'date_created', 'date_modified', 'latest_version', 'nr_of_versions', )
+        exclude = ()
+        #TODO: check objecttask type to determine serializer
+        return AssetReferenceSerializer(objecttask.content_object, context=self.context, exclude=exclude).data
+
+
+class ReferenceTaskSerializer(GenericForeignKeyMixin, ExtendedHyperlinkedModelSerializer):
+    references = ObjectTaskSerializer(source='objecttask_tasks', many=True)
+    class Meta:
+        from django_project.models import Task
+        model = Task
+        exclude = ['project', ]

@@ -19,15 +19,15 @@ class VersionMixin(object):
     def creator(self):
         version_list = reversion.get_for_object(self)
         return version_list.earliest('revision__date_created').revision.user
-        
+
     def modifier(self):
         version_list = reversion.get_for_object(self)
         return version_list.latest('revision__date_created').revision.user
-    
+
     def date_created(self):
         version_list = reversion.get_for_object(self)
         return version_list.earliest('revision__date_created').revision.date_created
-        
+
     def date_modified(self):
         version_list = reversion.get_for_object(self)
         return version_list.latest('revision__date_created').revision.date_created
