@@ -41,6 +41,8 @@ class FileReferenceSerializer(GenericForeignKeyMixin, ExtendedHyperlinkedModelSe
     uuid = serializers.CharField(source='hash')
     base_name = serializers.SerializerMethodField('get_base_name')
 
+    path = serializers.CharField(source='path.fullname')
+
     creator = HyperlinkedRelatedMethod()
     modifier = HyperlinkedRelatedMethod()
     date_created = serializers.DateField()
@@ -64,14 +66,14 @@ class AssetReferenceSerializer(GenericForeignKeyMixin, ExtendedHyperlinkedModelS
     subname = serializers.CharField()
     mimetype = serializers.CharField()
     file = serializers.HyperlinkedRelatedField(view_name='filereference-detail')
-    
+
     creator = HyperlinkedRelatedMethod()
     modifier = HyperlinkedRelatedMethod()
     date_created = serializers.DateField()
     date_modified = serializers.DateField()
     latest_version = serializers.IntegerField()
     nr_of_versions = serializers.IntegerField()
-    
+
     class Meta:
         from damn_rest.models import AssetReference
         model = AssetReference
@@ -86,7 +88,7 @@ class FileReferenceVerboseSerializer(FileReferenceSerializer):
 class AssetReferenceVerboseSerializer(AssetReferenceSerializer):
     file = FileReferenceSerializer()
     metadata = MetaDataValueField()
-    
+
 
 class AssetVersionSerializer(serializers.Serializer):
     id = serializers.IntegerField()

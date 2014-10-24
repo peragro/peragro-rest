@@ -46,6 +46,7 @@ INSTALLED_APPS = (
     'django_project',
     'smart_selects',
     'damn_rest',
+    'mptt',
 )
 
 MIDDLEWARE_CLASSES = (

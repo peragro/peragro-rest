@@ -19,15 +19,15 @@ class VersionMixin(object):
     def creator(self):
         version_list = reversion.get_for_object(self)
         return version_list.earliest('revision__date_created').revision.user
-        
+
     def modifier(self):
         version_list = reversion.get_for_object(self)
         return version_list.latest('revision__date_created').revision.user
-    
+
     def date_created(self):
         version_list = reversion.get_for_object(self)
         return version_list.earliest('revision__date_created').revision.date_created
-        
+
     def date_modified(self):
         version_list = reversion.get_for_object(self)
         return version_list.latest('revision__date_created').revision.date_created
@@ -79,6 +79,20 @@ class DescriptionModel(models.Model):
         self._description = SerializeThriftMsg(descr, TJSONProtocol)
 
 
+from mptt.models import MPTTModel, TreeForeignKey
+
+class Path(MPTTModel):
+    name = models.TextField()
+    parent = TreeForeignKey('self', null=True, blank=True, related_name='children')
+
+    class MPTTMeta:
+        order_insertion_by = ['name']
+
+    def fullname(self):
+        anc = self.get_ancestors(include_self=True)
+        return '/'.join(map(lambda x: str(x.name), anc))
+
+
 class FileReferenceManager(models.Manager):
     def update_or_create(self, user, project, filename, file_description):
         with transaction.atomic(), reversion.create_revision():
@@ -126,6 +140,7 @@ class FileReference(VersionMixin, DescriptionModel):
     _description_model = FileDescription
 
     project = models.ForeignKey(Project, related_name='files')
+    path = models.ForeignKey(Path, related_name='files')
     filename = models.TextField()
     hash = models.CharField(max_length=128, db_index=True)
     mimetype = models.CharField(max_length=255)

@@ -11,7 +11,7 @@ config = {
     'author_email': 'No, thanks',
     'version': '0.1',
     'test_suite': 'tests.suite',
-    'install_requires': ['damn_index', 'django_project'],
+    'install_requires': ['damn_index', 'django_project', 'django-mptt'],
     'test_requires': [],
     'packages': ['damn_rest'],
     'scripts': [],
