@@ -17,7 +17,7 @@ from damn_rest import serializers
 from rest_framework.parsers import MultiPartParser, FileUploadParser
 from rest_framework import authentication, permissions
 
-from django_project.models import Project
+from django_project.models import Project, Task
 from damn_rest.models import FileReference, AssetReference
 
 from damn_at import Analyzer
@@ -26,30 +26,30 @@ from damn_at.utilities import calculate_hash_for_file
 # curl -i -F filename=test2 -F file=@thumbs_up-600x600.png http://localhost:8000/projects/2/upload
 class FileUploadView(APIView):
     parser_classes = (MultiPartParser,)
-    
+
     #authentication_classes = (authentication.TokenAuthentication,)
     #permission_classes = (permissions.IsAdminUser,)
 
     def post(self, request, project_name):
         project = get_object_or_404(Project, pk=project_name)
-        
+
         if 'filename' not in request.POST or 'file' not in request.FILES:
             raise Response('Malformed request, needs to contain filename and file fields', status=400)
-        
-        filename = request.POST['filename']   
+
+        filename = request.POST['filename']
         file_obj = request.FILES['file']
-         
+
         #Write file to temporary location
         with tempfile.NamedTemporaryFile(delete=False) as destination:
             for chunk in file_obj.chunks():
                 destination.write(chunk)
-            destination.flush() 
+            destination.flush()
 
             hash = calculate_hash_for_file(destination.name)
 
             files_dir = '/tmp/damn/files'
             if not os.path.exists(files_dir):
-                os.makedirs(files_dir) 
+                os.makedirs(files_dir)
             new_path = os.path.join(files_dir, hash)
             os.rename(destination.name, new_path)
 
@@ -64,19 +64,19 @@ class FileUploadView(APIView):
 
 class FileReferenceViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
     """
-    """ 
+    """
     queryset = FileReference.objects.all()
     slug_field = 'hash'
-    
+
     def get_serializer_class(self):
       if 'pk' in self.kwargs:
           return serializers.FileReferenceVerboseSerializer
       return serializers.FileReferenceSerializer
-    
+
     @link(permission_classes=[])
     def download(self, request, pk=None):
         obj = self.get_object()
-        
+
         hash = obj.hash
         path = '/tmp/damn/files'
         fsock = open(os.path.join(path, hash), 'rb')
@@ -85,34 +85,34 @@ class FileReferenceViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
 class AssetReferenceViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
     """
-    """ 
+    """
     queryset = AssetReference.objects.all()
     slug_field = 'slug'
-    
+
     def get_serializer_class(self):
       if 'pk' in self.kwargs:
           return serializers.AssetReferenceVerboseSerializer
       return serializers.AssetReferenceSerializer
-    
+
     @link(permission_classes=[])
     def tasks(self, request, pk):
         obj = self.get_object()
-        
+
         from django_project.serializers import TaskSerializer
         serializer = TaskSerializer(obj.tasks, many=True)
-        
+
         return Response(serializer.data)
-        
+
     @link(permission_classes=[])
     def preview(self, request, pk):
         obj = self.get_object()
-        
+
         from damn_at.utilities import find_asset_id_in_file_descr
 
         file_descr = obj.file.description
-        
+
         asset_id = find_asset_id_in_file_descr(file_descr, obj.subname, obj.mimetype)
-        
+
         paths = transcode(file_descr, asset_id)
         print paths
         fsock = open(os.path.join('/tmp/damn/transcoded/', paths['256x256'][0]), 'rb')
@@ -122,16 +122,16 @@ class AssetReferenceViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
 
 class AssetRevisionsViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
     queryset = AssetReference.objects.all()
-    
+
     def get_serializer_class(self):
       if 'pk' in self.kwargs:
           return serializers.AssetVersionVerboseSerializer
       return serializers.AssetVersionSerializer
-    
+
     def get_queryset(self):
-        qs = super(AssetRevisionsViewSet, self).get_queryset()[0].versions() 
+        qs = super(AssetRevisionsViewSet, self).get_queryset()[0].versions()
         return qs
-        
+
     def get_parents_query_dict(self):
         filters = {}
         from rest_framework_extensions.settings import extensions_api_settings
@@ -143,14 +143,14 @@ class AssetRevisionsViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
                     filter = {'slug': self.kwargs[kwarg_name]}
                 filters.update(filter)
         return filters
-        
+
     @link(permission_classes=[])
     def preview(self, request, parent_lookup_asset, pk):
         version = self.get_queryset().get(pk=pk)
 
         from damn_at.utilities import find_asset_id_in_file_descr
         asset = version.object_version.object
-        
+
         #Why doesn't it restore the related fields?
         #file = asset.file
         #file_descr = file.description
@@ -159,16 +159,23 @@ class AssetRevisionsViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         file = file_version.object_version.object
         file_descr = file.description
         # End work-around
-        
+
         file_descr.file.filename = os.path.join('/tmp/damn/files', file.hash)
-        
+
         asset_id = find_asset_id_in_file_descr(file_descr, asset.subname, asset.mimetype)
-        
+
         paths = transcode(file_descr, asset_id)
         fsock = open(os.path.join('/tmp/damn/transcoded/', paths['256x256'][0]), 'rb')
 
         return StreamingHttpResponse(fsock, content_type='image/png')
-        
+
+
+class ReferenceTasksViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
+    """
+    """
+    queryset = Task.objects.exclude(objecttask_tasks=None)
+    serializer_class = serializers.ReferenceTaskSerializer
+
 
 def transcode(file_descr, asset_id, dst_mimetype='image/png', options={}, path='/tmp/damn/transcoded/'):
     """
@@ -176,17 +183,17 @@ def transcode(file_descr, asset_id, dst_mimetype='image/png', options={}, path='
     and return the paths to the transcoded files.
     """
     from damn_at import Transcoder
-    t = Transcoder(path)    
-    
+    t = Transcoder(path)
+
     preview_paths = {}
-    
-    
+
+
     target_mimetype = t.get_target_mimetype(asset_id.mimetype, dst_mimetype)
     if target_mimetype:
         for size in ['256,256']:
             options = t.parse_options(asset_id.mimetype, target_mimetype, size=size, angles='0')
-            
-            paths = t.get_paths(asset_id, target_mimetype, **options)    
+
+            paths = t.get_paths(asset_id, target_mimetype, **options)
             exists = all(map(lambda x: os.path.exists(os.path.join(path, x)), paths))
             print paths, exists
             if not exists:
@@ -199,5 +206,5 @@ def transcode(file_descr, asset_id, dst_mimetype='image/png', options={}, path='
         #print(t.get_target_mimetypes().keys())
         print('get_paths FAILED', asset_id.mimetype, dst_mimetype)
         raise Exception('No such transcoder %s - %s'%(asset_id.mimetype, dst_mimetype))
-         
+
     return preview_paths
