@@ -23,7 +23,7 @@ class UrlMixin:
             return ''
 
 
-class MetaDataValueField(serializers.RelatedField):
+class MetaDataValueField(serializers.Field):
     def to_native(self, metadata):
         ret = {}
         for key, value in metadata.items():

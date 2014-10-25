@@ -30,6 +30,7 @@ projects_router.register(r'assets', views.AssetReferenceViewSet, base_name='proj
 # Extend our registery with the django_project registery
 router.registry.extend(routerp.registry)
 
+#curl -X POST -d "username=admin&password=admin" http://localhost:8000/api-token-auth/
 urlpatterns = patterns('',
     url(r'^', include(router.urls)),
 

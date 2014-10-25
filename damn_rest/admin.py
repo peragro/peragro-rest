@@ -10,9 +10,9 @@ from damn_rest.models import FileReference, AssetReference, Path
 class FileReferenceAdminForm(forms.ModelForm):
     class Meta:
         model = FileReference
-        widgets = {
-          'path': TreeNodeChoiceField
-        }
+        #widgets = {
+        #  'path': TreeNodeChoiceField(queryset=Path.objects.all())
+        #}
 
 class FileReferenceAdmin(VersionAdmin):
     list_display = ( '__unicode__', 'nr_of_versions')
