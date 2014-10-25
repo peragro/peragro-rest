@@ -82,11 +82,15 @@ class DescriptionModel(models.Model):
 from mptt.models import MPTTModel, TreeForeignKey
 
 class Path(MPTTModel):
+    project = models.ForeignKey(Project, related_name='paths')
     name = models.TextField()
     parent = TreeForeignKey('self', null=True, blank=True, related_name='children')
 
     class MPTTMeta:
         order_insertion_by = ['name']
+
+    def __str__(self):
+        return str(self.name)
 
     def fullname(self):
         anc = self.get_ancestors(include_self=True)

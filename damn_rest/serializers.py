@@ -50,6 +50,22 @@ class BaseSerializer(serializers.Serializer):
             fields.pop(field)
         return fields
 
+
+class PathSerializer(GenericForeignKeyMixin, ExtendedHyperlinkedModelSerializer):
+    class Meta:
+        from damn_rest.models import Path
+        model = Path
+
+    def to_native(self, path):
+        ret = {}
+        ret['id'] = path.pk
+        ret['name'] = path.name
+        ret['children'] = []
+        for child in path.get_children():
+            ret['children'].append(self.to_native(child))
+        return ret
+
+
 class FileReferenceSerializer(GenericForeignKeyMixin, ExtendedHyperlinkedModelSerializer):
     uuid = serializers.CharField(source='hash')
     base_name = serializers.SerializerMethodField('get_base_name')

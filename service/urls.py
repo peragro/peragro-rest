@@ -8,6 +8,9 @@ from rest_framework_extensions.routers import ExtendedDefaultRouter
 
 router = ExtendedDefaultRouter()
 
+# Path router
+paths_router = router.register(r'paths', views.PathViewSet)
+
 # File router and its nested routes
 files_router = router.register(r'files', views.FileReferenceViewSet)
 files_router.register(r'assets', views.AssetReferenceViewSet, base_name='files-asset', parents_query_lookups=['file'])
@@ -26,6 +29,7 @@ from django_project.urls import projects_router
 # Project router and its nested routes
 projects_router.register(r'files', views.FileReferenceViewSet, base_name='projects-filereference', parents_query_lookups=['project'])
 projects_router.register(r'assets', views.AssetReferenceViewSet, base_name='projects-assetreference', parents_query_lookups=['file__project'])
+projects_router.register(r'paths', views.PathViewSet, base_name='projects-path', parents_query_lookups=['project'])
 
 # Extend our registery with the django_project registery
 router.registry.extend(routerp.registry)

@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 from rest_framework import viewsets
 from rest_framework import mixins
 from rest_framework.response import Response
-from rest_framework.decorators import action, link
+from rest_framework_extensions.decorators import action, link
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from damn_rest import serializers
@@ -17,11 +17,15 @@ from damn_rest import serializers
 from rest_framework.parsers import MultiPartParser, FileUploadParser
 from rest_framework import authentication, permissions
 
+from django_project.views import FilteredModelViewSetMixin
+
 from django_project.models import Project, Task
-from damn_rest.models import FileReference, AssetReference
+from damn_rest.models import Path, FileReference, AssetReference
 
 from damn_at import Analyzer
 from damn_at.utilities import calculate_hash_for_file
+
+from damn_rest import filters as dp_filters
 
 # curl -i -F filename=test2 -F file=@thumbs_up-600x600.png http://localhost:8000/projects/2/upload
 class FileUploadView(APIView):
@@ -62,11 +66,22 @@ class FileUploadView(APIView):
             return Response('FileReference with id %s created'%file_ref.id, status=204)
 
 
-class FileReferenceViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
+
+class PathViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
+    """
+    """
+    queryset = Path.objects.filter(parent=None)
+    serializer_class = serializers.PathSerializer
+
+
+class FileReferenceViewSet(NestedViewSetMixin, FilteredModelViewSetMixin, viewsets.ReadOnlyModelViewSet):
     """
     """
     queryset = FileReference.objects.all()
     slug_field = 'hash'
+
+    filter_class = dp_filters.FileReferenceFilter
+    search_fields = ('hash', )
 
     def get_serializer_class(self):
       if 'pk' in self.kwargs:
@@ -81,6 +96,15 @@ class FileReferenceViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         path = '/tmp/damn/files'
         fsock = open(os.path.join(path, hash), 'rb')
         return StreamingHttpResponse(fsock, content_type=file_descr.mimetype)
+
+    @link(is_for_list=True)
+    def latest(self, request, **kwargs):
+        ret = {}
+        from reversion.models import Version
+        from django.contrib.contenttypes.models import ContentType
+        content_type = ContentType.objects.get_for_model(FileReference)
+        latest = Version.objects.filter(content_type=content_type).latest('revision__date_created')
+        return Response(serializers.FileReferenceVerboseSerializer(latest.object).data)
 
 
 class AssetReferenceViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
