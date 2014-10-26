@@ -98,13 +98,13 @@ class Path(MPTTModel):
 
 
 class FileReferenceManager(models.Manager):
-    def update_or_create(self, user, project, filename, file_description):
+    def update_or_create(self, user, project, path, filename, file_description):
         with transaction.atomic(), reversion.create_revision():
             try:
-                fileref = FileReference.objects.get(project=project, filename=filename)
+                fileref = FileReference.objects.get(project=project, path=path, filename=filename)
                 created = False
             except FileReference.DoesNotExist:
-                fileref = FileReference(project=project, filename=filename, hash='', mimetype='', _description='')
+                fileref = FileReference(project=project, path=path, filename=filename, hash='', mimetype='', _description='')
                 created = True
 
             if not created and fileref.hash == file_description.file.hash:

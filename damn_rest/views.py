@@ -37,11 +37,15 @@ class FileUploadView(APIView):
     def post(self, request, project_name):
         project = get_object_or_404(Project, pk=project_name)
 
+
         if 'filename' not in request.POST or 'file' not in request.FILES:
             raise Response('Malformed request, needs to contain filename and file fields', status=400)
 
-        filename = request.POST['filename']
+        path_id = request.POST['path_id']
+        filename = os.path.basename(request.POST['filename'])
         file_obj = request.FILES['file']
+
+        path = get_object_or_404(Path, pk=path_id)
 
         #Write file to temporary location
         with tempfile.NamedTemporaryFile(delete=False) as destination:
@@ -61,9 +65,10 @@ class FileUploadView(APIView):
             file_descr = analyzer.analyze_file(new_path)
             file_descr.file.hash = hash
 
-            file_ref = FileReference.objects.update_or_create(request.user, project, filename, file_descr)
+            file_ref = FileReference.objects.update_or_create(request.user, project, path, filename, file_descr)
 
             return Response('FileReference with id %s created'%file_ref.id, status=204)
+
 
 
 
@@ -72,6 +77,31 @@ class PathViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
     """
     queryset = Path.objects.filter(parent=None)
     serializer_class = serializers.PathSerializer
+
+    @link(is_for_list=True)
+    def explore(self, request, **kwargs):
+        project_id = kwargs['parent_lookup_project']
+        path_id = request.QUERY_PARAMS.get('path_id', None)
+        path_id = path_id if path_id and path_id.isdigit() else None
+        def has_children(path):
+            return path.get_children().count() > 0 or path.files.count() > 0
+        def to_native(path):
+            ret = {}
+            ret['id'] = path.pk
+            ret['text'] = path.name
+            if has_children(path):
+                ret['children'] = []
+                for child in path.get_children():
+                    ret['children'].append({'text': child.name,'id': child.pk, 'children': has_children(child)})
+                for file in path.files.values('id', 'filename'):
+                    ret['children'].append({'text': file['filename'], 'id': 'file_'+str(file['id']), 'icon': 'http://jstree.com/tree.png', 'type': 'file'})
+            return ret
+        filter = {'project': project_id}
+        if path_id:
+            filter['pk'] = path_id
+        else:
+            filter['parent'] = None
+        return Response(to_native(Path.objects.get(**filter)))
 
 
 class FileReferenceViewSet(NestedViewSetMixin, FilteredModelViewSetMixin, viewsets.ReadOnlyModelViewSet):
