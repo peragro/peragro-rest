@@ -81,20 +81,43 @@ class DescriptionModel(models.Model):
 
 from mptt.models import MPTTModel, TreeForeignKey
 
+class PathManager(models.Manager):
+    def get_or_create(self, project, path):
+        with transaction.atomic():
+            paths = path.split('/')
+            paths.insert(0, '/')
+            parent = None
+            for p in paths:
+                p = p.strip()
+                if p != '':
+                    obj, created = super(PathManager, self).get_or_create(project=project, parent=parent, name=p)
+                    parent = obj
+
+            return parent
+
+
 class Path(MPTTModel):
     project = models.ForeignKey(Project, related_name='paths')
     name = models.TextField()
+    fullname = models.TextField(editable=False)
     parent = TreeForeignKey('self', null=True, blank=True, related_name='children')
+
+    objects = PathManager()
 
     class MPTTMeta:
         order_insertion_by = ['name']
 
     def __str__(self):
-        return str(self.name)
+        return str(self.fullname)+', '+str(self.name)
 
-    def fullname(self):
-        anc = self.get_ancestors(include_self=True)
-        return '/'.join(map(lambda x: str(x.name), anc))
+
+from django.db.models.signals import pre_save
+from django.dispatch import receiver
+
+@receiver(pre_save, sender=Path)
+def path_pre_save_callback(sender, instance, *args, **kwargs):
+    anc = instance.get_ancestors(include_self=True)
+    instance.fullname = '/'.join(map(lambda x: str(x.name) if x.name != '/' else '', anc))
 
 
 class FileReferenceManager(models.Manager):
@@ -147,7 +170,7 @@ class FileReference(VersionMixin, DescriptionModel):
     path = models.ForeignKey(Path, related_name='files')
     filename = models.TextField()
     hash = models.CharField(max_length=128, db_index=True)
-    mimetype = models.CharField(max_length=255)
+    mimetype = models.CharField(max_length=255, null=True, blank=True)
 
     objects = FileReferenceManager()
 
@@ -180,7 +203,7 @@ class AssetReference(VersionMixin, ObjectTaskMixin, DescriptionModel):
 
     file = models.ForeignKey(FileReference, related_name='assets')
     subname = models.CharField(max_length=255)
-    mimetype = models.CharField(max_length=255)
+    mimetype = models.CharField(max_length=255, null=True, blank=True)
 
     slug = models.TextField(db_index=True)
 

@@ -22,7 +22,8 @@ from django_project.views import FilteredModelViewSetMixin
 from django_project.models import Project, Task
 from damn_rest.models import Path, FileReference, AssetReference
 
-from damn_at import Analyzer
+from damn_at import Analyzer, FileDescription, FileId
+from damn_at.analyzer import AnalyzerException
 from damn_at.utilities import calculate_hash_for_file
 
 from damn_rest import filters as dp_filters
@@ -38,14 +39,17 @@ class FileUploadView(APIView):
         project = get_object_or_404(Project, pk=project_name)
 
 
-        if 'filename' not in request.POST or 'file' not in request.FILES:
-            raise Response('Malformed request, needs to contain filename and file fields', status=400)
+        if ('path_id' not in request.POST and 'path' not in request.POST) or 'file' not in request.FILES:
+            return Response('Malformed request, needs to contain filename and file fields', status=400)
 
-        path_id = request.POST['path_id']
-        filename = os.path.basename(request.POST['filename'])
+        if 'path' in request.POST:
+            path = Path.objects.get_or_create(project, request.POST['path'])
+        else:
+            path_id = request.POST['path_id']
+            path = get_object_or_404(Path, project=project, pk=path_id)
+
         file_obj = request.FILES['file']
-
-        path = get_object_or_404(Path, pk=path_id)
+        filename = file_obj.name
 
         #Write file to temporary location
         with tempfile.NamedTemporaryFile(delete=False) as destination:
@@ -62,12 +66,16 @@ class FileUploadView(APIView):
             os.rename(destination.name, new_path)
 
             analyzer = Analyzer()
-            file_descr = analyzer.analyze_file(new_path)
+            try:
+                file_descr = analyzer.analyze_file(new_path)
+            except AnalyzerException as ae:
+                file_descr = FileDescription(file=FileId())
+
             file_descr.file.hash = hash
 
             file_ref = FileReference.objects.update_or_create(request.user, project, path, filename, file_descr)
 
-            return Response('FileReference with id %s created'%file_ref.id, status=204)
+            return Response(serializers.FileReferenceSerializer(file_ref, context={'request': request}).data)
 
 
 
@@ -85,23 +93,16 @@ class PathViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         path_id = path_id if path_id and path_id.isdigit() else None
         def has_children(path):
             return path.get_children().count() > 0 or path.files.count() > 0
-        def to_native(path):
-            ret = {}
-            ret['id'] = path.pk
-            ret['text'] = path.name
-            if has_children(path):
-                ret['children'] = []
-                for child in path.get_children():
-                    ret['children'].append({'text': child.name,'id': child.pk, 'children': has_children(child)})
-                for file in path.files.values('id', 'filename'):
-                    ret['children'].append({'text': file['filename'], 'id': 'file_'+str(file['id']), 'icon': 'http://jstree.com/tree.png', 'type': 'file'})
+        def to_native(filter):
+            ret = []
+            for path in Path.objects.filter(**filter):
+                ret.append({'text': path.name, 'path_id': path.pk, 'children': has_children(path)})
+            for file in FileReference.objects.filter(path=path_id).values('id', 'filename'):
+                ret.append({'text': file['filename'], 'file_id': file['id'], 'icon': 'jstree-file', 'type': 'file'})
             return ret
         filter = {'project': project_id}
-        if path_id:
-            filter['pk'] = path_id
-        else:
-            filter['parent'] = None
-        return Response(to_native(Path.objects.get(**filter)))
+        filter['parent'] = path_id
+        return Response(to_native(filter))
 
 
 class FileReferenceViewSet(NestedViewSetMixin, FilteredModelViewSetMixin, viewsets.ReadOnlyModelViewSet):
@@ -134,7 +135,7 @@ class FileReferenceViewSet(NestedViewSetMixin, FilteredModelViewSetMixin, viewse
         from django.contrib.contenttypes.models import ContentType
         content_type = ContentType.objects.get_for_model(FileReference)
         latest = Version.objects.filter(content_type=content_type).latest('revision__date_created')
-        return Response(serializers.FileReferenceVerboseSerializer(latest.object).data)
+        return Response(serializers.FileReferenceVerboseSerializer(latest.object, context={'request': request}).data)
 
 
 class AssetReferenceViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
@@ -153,7 +154,7 @@ class AssetReferenceViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         obj = self.get_object()
 
         from django_project.serializers import TaskSerializer
-        serializer = TaskSerializer(obj.tasks, many=True)
+        serializer = TaskSerializer(obj.tasks, many=True, context={'request': request})
 
         return Response(serializer.data)
 

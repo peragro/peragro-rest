@@ -26,9 +26,10 @@ class UrlMixin:
 class MetaDataValueField(serializers.Field):
     def to_native(self, metadata):
         ret = {}
-        for key, value in metadata.items():
-            type_name = ['bool_value', 'int_value', 'double_value', 'string_value'][value.type-1]
-            ret[key] = (MetaDataType._VALUES_TO_NAMES[value.type], getattr(value, type_name, None))
+        if metadata:
+            for key, value in metadata.items():
+                type_name = ['bool_value', 'int_value', 'double_value', 'string_value'][value.type-1]
+                ret[key] = (MetaDataType._VALUES_TO_NAMES[value.type], getattr(value, type_name, None))
         return ret
 
 from django_project.serializers import (
@@ -66,9 +67,8 @@ class PathSerializer(GenericForeignKeyMixin, ExtendedHyperlinkedModelSerializer)
         return ret
 
 
-class FileReferenceSerializer(GenericForeignKeyMixin, ExtendedHyperlinkedModelSerializer):
+class FileReferenceSerializer(BaseSerializer, GenericForeignKeyMixin, ExtendedHyperlinkedModelSerializer):
     uuid = serializers.CharField(source='hash')
-    base_name = serializers.SerializerMethodField('get_base_name')
 
     path = serializers.CharField(source='path.fullname')
 
@@ -78,9 +78,6 @@ class FileReferenceSerializer(GenericForeignKeyMixin, ExtendedHyperlinkedModelSe
     date_modified = serializers.DateField()
     latest_version = serializers.IntegerField()
     nr_of_versions = serializers.IntegerField()
-
-    def get_base_name(self, file_id):
-        return os.path.basename(file_id.filename)
 
     class Meta:
         from damn_rest.models import FileReference
@@ -157,8 +154,14 @@ class ObjectTaskSerializer(serializers.Serializer):
     def to_native(self, objecttask):
         #exclude = ('creator', 'modifier', 'date_created', 'date_modified', 'latest_version', 'nr_of_versions', )
         exclude = ()
+        from damn_rest.models import FileReference, AssetReference
         #TODO: check objecttask type to determine serializer
-        return AssetReferenceSerializer(objecttask.content_object, context=self.context, exclude=exclude).data
+        if isinstance(objecttask.content_object, AssetReference):
+            return AssetReferenceSerializer(objecttask.content_object, context=self.context, exclude=exclude).data
+        elif isinstance(objecttask.content_object, FileReference):
+            return FileReferenceSerializer(objecttask.content_object, context=self.context, exclude=exclude).data
+        else:
+            raise Exception()
 
 
 class ReferenceTaskSerializer(GenericForeignKeyMixin, ExtendedHyperlinkedModelSerializer):
