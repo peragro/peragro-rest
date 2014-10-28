@@ -157,9 +157,13 @@ class ObjectTaskSerializer(serializers.Serializer):
         from damn_rest.models import FileReference, AssetReference
         #TODO: check objecttask type to determine serializer
         if isinstance(objecttask.content_object, AssetReference):
-            return AssetReferenceSerializer(objecttask.content_object, context=self.context, exclude=exclude).data
+            data = AssetReferenceSerializer(objecttask.content_object, context=self.context, exclude=exclude).data
+            data['type'] = 'assetreference'
+            return data
         elif isinstance(objecttask.content_object, FileReference):
-            return FileReferenceSerializer(objecttask.content_object, context=self.context, exclude=exclude).data
+            data = FileReferenceSerializer(objecttask.content_object, context=self.context, exclude=exclude).data
+            data['type'] = 'filereference'
+            return data
         else:
             raise Exception()
 
