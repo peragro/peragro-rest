@@ -1,4 +1,4 @@
-damn-rest
+peragro-rest
 ==========
 
-Django-based REST api for DAMN.
+Django-based REST api for Peragro.
