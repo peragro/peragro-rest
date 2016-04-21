@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django import forms
-from reversion import VersionAdmin
+from reversion.admin import VersionAdmin
 
 from mptt.admin import MPTTModelAdmin
 from mptt.forms import TreeNodeChoiceField
@@ -10,6 +10,7 @@ from damn_rest.models import FileReference, AssetReference, Path
 class FileReferenceAdminForm(forms.ModelForm):
     class Meta:
         model = FileReference
+        exclude = ()
         #widgets = {
         #  'path': TreeNodeChoiceField(queryset=Path.objects.all())
         #}

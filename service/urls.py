@@ -4,6 +4,7 @@ from damn_rest import views
 from django.contrib import admin
 admin.autodiscover()
 
+from rest_framework.authtoken.views import obtain_auth_token
 from rest_framework_extensions.routers import ExtendedDefaultRouter
 
 router = ExtendedDefaultRouter()
@@ -35,15 +36,15 @@ projects_router.register(r'paths', views.PathViewSet, base_name='projects-path',
 router.registry.extend(routerp.registry)
 
 #curl -X POST -d "username=admin&password=admin" http://localhost:8000/api-token-auth/
-urlpatterns = patterns('',
+urlpatterns = [
     url(r'^', include(router.urls)),
 
     url(r'^', include(django_project.urls)),
 
     url(r'^api-auth/', include('rest_framework.urls', namespace='rest_framework')),
-    url(r'^api-token-auth/', 'rest_framework.authtoken.views.obtain_auth_token'),
+    url(r'^api-token-auth/', obtain_auth_token),
 
     url(r'^projects/(?P<project_name>\w+)/upload/', views.FileUploadView.as_view(), name='upload_file'),
 
     url(r'^admin/', include(admin.site.urls)),
-)
+]

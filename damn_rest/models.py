@@ -3,17 +3,17 @@ from collections import namedtuple
 from django.db import models
 from django.db.models import Q
 
-from django.contrib.auth import get_user_model
+from django.conf import settings
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from rest_framework.authtoken.models import Token
 
-@receiver(post_save, sender=get_user_model())
+@receiver(post_save, sender=settings.AUTH_USER_MODEL)
 def create_auth_token(sender, instance=None, created=False, **kwargs):
     if created:
         Token.objects.create(user=instance)
 
-import reversion
+from reversion import revisions as reversion
 from django.db import transaction
 class VersionMixin(object):
     def creator(self):
@@ -147,13 +147,11 @@ class FileReferenceManager(models.Manager):
             for assetref in qs:
                 assetid = (assetref.subname, assetref.mimetype)
                 if assetid not in assetids:
-                    print 'Deleting', assetref
                     assetref.delete()
 
             # Update or create assets that are in the description
             if file_description.assets:
                 for asset_description in file_description.assets:
-                    print 'FileReferenceManager: updating asset', asset_description.asset
                     AssetReference.objects.update_or_create(user, fileref, asset_description)
 
             if user.is_authenticated():
@@ -190,11 +188,9 @@ class AssetReferenceManager(models.Manager):
         except AssetReference.DoesNotExist:
             assetref = AssetReference(file=fileref, subname=asset_description.asset.subname, mimetype=asset_description.asset.mimetype)
             created = True
-        print 'AssetReferenceManager: updating asset', asset_description.asset, created
         assetref.description = asset_description
         assetref.save()
         #assetref.save_revision(user, 'Initial revision' if created else 'Updated asset')
-        print assetref.versions()
         return assetref
 
 

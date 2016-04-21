@@ -169,7 +169,6 @@ class AssetReferenceViewSet(NestedViewSetMixin, viewsets.ReadOnlyModelViewSet):
         asset_id = find_asset_id_in_file_descr(file_descr, obj.subname, obj.mimetype)
 
         paths = transcode(file_descr, asset_id)
-        print paths
         fsock = open(os.path.join('/tmp/damn/transcoded/', paths['256x256'][0]), 'rb')
 
         return StreamingHttpResponse(fsock, content_type='image/png')
@@ -250,7 +249,6 @@ def transcode(file_descr, asset_id, dst_mimetype='image/png', options={}, path='
 
             paths = t.get_paths(asset_id, target_mimetype, **options)
             exists = all(map(lambda x: os.path.exists(os.path.join(path, x)), paths))
-            print paths, exists
             if not exists:
                 print('Transcoding', asset_id.subname, file_descr.file.filename)
                 t.transcode(file_descr, asset_id, dst_mimetype, **options)

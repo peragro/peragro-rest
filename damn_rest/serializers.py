@@ -41,7 +41,6 @@ from django_project.serializers import (
 class BaseSerializer(serializers.Serializer):
     def __init__(self, *args, **kwargs):
         self._exclude_fields = kwargs.get('exclude', [])
-        print kwargs
         if 'exclude' in kwargs:
             kwargs.pop('exclude')
         super(BaseSerializer, self).__init__(*args, **kwargs)
@@ -91,7 +90,7 @@ class AssetReferenceSerializer(BaseSerializer, GenericForeignKeyMixin, ExtendedH
     url = serializers.HyperlinkedIdentityField(view_name='assetreference-detail', format='html')
     subname = serializers.CharField()
     mimetype = serializers.CharField()
-    file = serializers.HyperlinkedRelatedField(view_name='filereference-detail')
+    file = serializers.HyperlinkedRelatedField(view_name='filereference-detail', read_only=True)
 
     creator = HyperlinkedRelatedMethod()
     modifier = HyperlinkedRelatedMethod()
