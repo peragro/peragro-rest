@@ -1,7 +1,7 @@
 from __future__ import absolute_import
 from __future__ import print_function
 import os
-import urllib
+import urllib.request, urllib.parse, urllib.error
 
 from django.contrib.auth.models import User, Group
 from rest_framework import serializers
@@ -29,7 +29,7 @@ class MetaDataValueField(serializers.Field):
     def to_native(self, metadata):
         ret = {}
         if metadata:
-            for key, value in metadata.items():
+            for key, value in list(metadata.items()):
                 type_name = ['bool_value', 'int_value', 'double_value', 'string_value'][value.type-1]
                 ret[key] = (MetaDataType._VALUES_TO_NAMES[value.type], getattr(value, type_name, None))
         return ret
