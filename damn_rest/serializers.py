@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+from __future__ import print_function
 import os
 import urllib
 
@@ -19,7 +21,7 @@ class UrlMixin:
             kwargs = {'pk': self.get_id(obj)}
             return reverse(self.view_name, kwargs=kwargs, request=self.context.get('request', None), format=None)
         except Exception as e:
-            print('Exception', e)
+            print(('Exception', e))
             return ''
 
 

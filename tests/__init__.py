@@ -1,4 +1,5 @@
 """The tests collector used in setup.py"""
+from __future__ import absolute_import
 import os
 import unittest
 

@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+from __future__ import print_function
 import os
 import tempfile
 
@@ -248,16 +250,16 @@ def transcode(file_descr, asset_id, dst_mimetype='image/png', options={}, path='
             options = t.parse_options(asset_id.mimetype, target_mimetype, size=size, angles='0')
 
             paths = t.get_paths(asset_id, target_mimetype, **options)
-            exists = all(map(lambda x: os.path.exists(os.path.join(path, x)), paths))
+            exists = all([os.path.exists(os.path.join(path, x)) for x in paths])
             if not exists:
-                print('Transcoding', asset_id.subname, file_descr.file.filename)
+                print(('Transcoding', asset_id.subname, file_descr.file.filename))
                 t.transcode(file_descr, asset_id, dst_mimetype, **options)
             #print('get_paths', asset_id.mimetype, paths)
             preview_paths[size.replace(',', 'x')] = paths
-            preview_paths['exists-'+size.replace(',', 'x')] = map(lambda x: os.path.exists(os.path.join(path, x)), paths)
+            preview_paths['exists-'+size.replace(',', 'x')] = [os.path.exists(os.path.join(path, x)) for x in paths]
     else:
         #print(t.get_target_mimetypes().keys())
-        print('get_paths FAILED', asset_id.mimetype, dst_mimetype)
+        print(('get_paths FAILED', asset_id.mimetype, dst_mimetype))
         raise Exception('No such transcoder %s - %s'%(asset_id.mimetype, dst_mimetype))
 
     return preview_paths
