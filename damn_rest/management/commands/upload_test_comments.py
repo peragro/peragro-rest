@@ -38,27 +38,27 @@ class Command(BaseCommand):
         try:
             data = json.loads(response.content)
         except Exception as e:
-            print e
+            print(e)
             data = None
         return data, response
 
     def get(self, url):
         headers = {'HTTP_AUTHORIZATION': 'Token '+self.token}
-        print 'GET', url
+        print('GET', url)
         response = self.c.get(url, follow=True, **headers)
         try:
             data = json.loads(response.content)
         except Exception as e:
-            print '--------------------'
-            print response.status_code
-            print e
-            print response.content
-            print '--------------------'
+            print('--------------------')
+            print(response.status_code)
+            print(e)
+            print(response.content)
+            print('--------------------')
             data = None
         return data, response
 
     def handle(self, *args, **options):
-        print 'uploading...'
+        print('uploading...')
         self.login('admin', 'admin')
 
         from django_project.models import Comment
@@ -79,9 +79,9 @@ class Command(BaseCommand):
             for i in range(5):
                 data = {'comment': sing_sen_maker(),}
                 data, response = self.post('/tasks/{task_id}/comments/'.format(task_id=task_id), data)
-                print data
+                print(data)
                 comment_id = data['id']
-                print comment_id
+                print(comment_id)
 
 
         for task in tasks_data['results']:

@@ -117,7 +117,7 @@ from django.dispatch import receiver
 @receiver(pre_save, sender=Path)
 def path_pre_save_callback(sender, instance, *args, **kwargs):
     anc = instance.get_ancestors(include_self=True)
-    instance.fullname = '/'.join(map(lambda x: str(x.name) if x.name != '/' else '', anc))
+    instance.fullname = '/'.join([str(x.name) if x.name != '/' else '' for x in anc])
 
 
 class FileReferenceManager(models.Manager):

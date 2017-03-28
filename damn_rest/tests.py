@@ -27,17 +27,17 @@ class UploadPaperTest(TestCase):
         token = Token.objects.create(user=self.user)
     
     def test_paper_upload(self):
-        print Token.objects.all()
+        print(Token.objects.all())
         token =  Token.objects.get(user_id = self.user.pk) # this outputs a normal looking token
         token_auth = self.client.post("/api-token-auth/", {'username': 'admin', 'password': 'admin'})
-        print token_auth.data, token_auth.status_code # this outputs 400
+        print(token_auth.data, token_auth.status_code) # this outputs 400
         self.assertEqual(token_auth.status_code, 200, "User couldn't log in")
         
         
         response = self.client.login(username=self.user.username, password='admin')
-        print('-'*70)
+        print(('-'*70))
         print(response)
-        print('-'*70)
+        print(('-'*70))
         self.assertTrue(response)
         
         f = open("/home/sueastside/dev/DAMN/damn-test-files/image/jpg/crate10b.jpg", 'rb')

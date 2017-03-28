@@ -1,5 +1,5 @@
 import os
-import urllib
+import urllib.request, urllib.parse, urllib.error
 
 from django.contrib.auth.models import User, Group
 from rest_framework import serializers
@@ -19,7 +19,7 @@ class UrlMixin:
             kwargs = {'pk': self.get_id(obj)}
             return reverse(self.view_name, kwargs=kwargs, request=self.context.get('request', None), format=None)
         except Exception as e:
-            print('Exception', e)
+            print(('Exception', e))
             return ''
 
 
@@ -27,7 +27,7 @@ class MetaDataValueField(serializers.Field):
     def to_native(self, metadata):
         ret = {}
         if metadata:
-            for key, value in metadata.items():
+            for key, value in list(metadata.items()):
                 type_name = ['bool_value', 'int_value', 'double_value', 'string_value'][value.type-1]
                 ret[key] = (MetaDataType._VALUES_TO_NAMES[value.type], getattr(value, type_name, None))
         return ret
