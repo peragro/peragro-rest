@@ -7,7 +7,7 @@ django-model-utils==2.3.1
 django-mptt==0.8.3                                                                                     
 django-notifications-hq==1.0                                                                           
 django-reversion==1.10.1                                                                               
-django-smart-selects==1.2.2                                                                            
+django-smart-selects==1.2.9                                                                            
 djangorestframework==3.3.2                                                                             
 drf-extensions==0.2.8                                                                                  
 filemagic==1.6                                                                                         
